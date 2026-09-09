@@ -1,5 +1,44 @@
+@import '@fontsource/anton';
+@import '@fontsource/space-grotesk/300.css';
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/space-mono/400.css';
+@import '@fontsource/space-mono/700.css';
+@import '@fontsource/newsreader/400.css';
+@import '@fontsource/newsreader/400-italic.css';
 
 @import "tailwindcss";
+
+@theme {
+  --color-canvas: #131313;
+  --color-surface: #2d2d2d;
+  --color-frame: #313131;
+
+  --color-mint: #3cffd0;
+  --color-uv: #5200ff;
+  --color-mint-border: #309875;
+  --color-rule: #3d00bf;
+
+  --color-fog: #949494;
+  --color-bone: #e9e9e9;
+
+  --color-link: #3860be;
+  --color-focus: #1eaedb;
+  --color-dim: #8c8c8c;
+
+  --font-display: "Anton", Impact, Helvetica, sans-serif;
+  --font-sans: "Space Grotesk", Helvetica, Arial, sans-serif;
+  --font-mono: "Space Mono", "Courier New", Courier, monospace;
+  --font-serif: "Newsreader", Georgia, serif;
+
+  --leading-display: 0.95;
+
+  --radius-tile: 20px;
+  --radius-feature: 24px;
+  --radius-promo: 30px;
+  --radius-cta: 40px;
+}
 
 * {
   box-sizing: border-box;
@@ -13,5 +52,9 @@ body,
 
 body {
   margin: 0;
+  background-color: var(--color-canvas);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
