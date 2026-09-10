@@ -3,3 +3,4 @@ dist
 .alchemy
 src/routeTree.gen.ts
 .docs
+.opencode
