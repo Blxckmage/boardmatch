@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 
+import { PillTag } from "#/components/ui";
+import {
+	cardTransform,
+	useDragMachine,
+	type Direction,
+	type FlingSignal,
+} from "#/components/swipe-gesture";
 import type { GameCard } from "#/server/room-protocol";
 
-export type Direction = "left" | "right";
+export type { Direction } from "#/components/swipe-gesture";
 
-const SWIPE_PX = 120;
 const STAMP_PX = 100;
 
-function useArrowKeys(
-	getGame: () => GameCard | undefined,
-	cast: (id: number, direction: Direction) => void,
-) {
+function useArrowKeys(onArrow: (direction: Direction) => void) {
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			const current = getGame();
-			if (!current) return;
 			if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-				cast(current.id, e.key === "ArrowRight" ? "right" : "left");
+				onArrow(e.key === "ArrowRight" ? "right" : "left");
 			}
 		};
 		window.addEventListener("keydown", onKey);
@@ -32,13 +33,19 @@ export function SwipeDeck({
 	onSwipe: (gameId: number, direction: Direction) => void;
 }) {
 	const [index, setIndex] = useState(0);
+	const [signal, setSignal] = useState<FlingSignal>(null);
 	const game = deck[index];
 
 	const cast = (id: number, direction: Direction) => {
 		onSwipe(id, direction);
+		setSignal(null);
 		setIndex((i) => i + 1);
 	};
-	useArrowKeys(() => deck[index], cast);
+	const castAnimated = (direction: Direction) => {
+		if (!deck[index] || signal) return;
+		setSignal((s) => ({ direction, n: (s?.n ?? 0) + 1 }));
+	};
+	useArrowKeys(castAnimated);
 
 	if (!game) {
 		return (
@@ -50,18 +57,24 @@ export function SwipeDeck({
 
 	return (
 		<div className="mx-auto mt-8 w-full max-w-sm">
+			<DeckCounter left={deck.length - index} />
 			<DragCard
 				key={game.id}
 				game={game}
 				next={deck[index + 1]}
+				signal={signal}
 				onFling={(direction) => cast(game.id, direction)}
 			/>
 			<DeckButtons
-				onSkip={() => cast(game.id, "left")}
-				onPlay={() => cast(game.id, "right")}
+				onSkip={() => castAnimated("left")}
+				onPlay={() => castAnimated("right")}
 			/>
 		</div>
 	);
+}
+
+function DeckCounter({ left }: { left: number }) {
+	return <PillTag tone="mint">{left} left</PillTag>;
 }
 
 function DeckButtons({
@@ -77,7 +90,7 @@ function DeckButtons({
 				type="button"
 				onClick={onSkip}
 				aria-label="Skip"
-				className="h-16 w-16 rounded-full bg-surface font-sans text-2xl font-bold text-bone"
+				className="h-16 w-16 cursor-pointer rounded-full bg-surface font-sans text-2xl font-bold text-bone"
 			>
 				✕
 			</button>
@@ -85,7 +98,7 @@ function DeckButtons({
 				type="button"
 				onClick={onPlay}
 				aria-label="I'd play this"
-				className="h-16 w-16 rounded-full bg-mint font-sans text-2xl font-bold text-black"
+				className="h-16 w-16 cursor-pointer rounded-full bg-mint font-sans text-2xl font-bold text-black"
 			>
 				✓
 			</button>
@@ -93,94 +106,35 @@ function DeckButtons({
 	);
 }
 
-type Drag = { x: number; y: number; active: boolean };
-
-function cardTransform(
-	drag: Drag,
+function useFlingSignal(
+	signal: FlingSignal,
 	fling: Direction | null,
-	snapping: boolean,
-): { transform: string; transition: string } {
-	if (fling) {
-		return {
-			transform: `translate3d(${fling === "right" ? 140 : -140}vw, ${drag.y}px, 0) rotate(${
-				fling === "right" ? 18 : -18
-			}deg)`,
-			transition: "transform 250ms linear",
-		};
-	}
-	if (drag.active) {
-		const rotation = Math.max(-10, Math.min(10, drag.x / 14));
-		return {
-			transform: `translate3d(${drag.x}px, ${drag.y}px, 0) rotate(${rotation}deg)`,
-			transition: "none",
-		};
-	}
-	return {
-		transform: "translate3d(0, 0, 0)",
-		transition: snapping ? "transform 200ms ease-out" : "none",
-	};
-}
-
-function useDragMachine(onFling: (direction: Direction) => void) {
-	const [drag, setDrag] = useState<Drag>({ x: 0, y: 0, active: false });
-	const [fling, setFling] = useState<Direction | null>(null);
-	const [snapping, setSnapping] = useState(false);
-	const gesture = useRef<{ x: number; y: number; pid: number } | null>(null);
-	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(
-		() => () => {
-			if (timer.current) clearTimeout(timer.current);
-		},
-		[],
-	);
-
-	const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-		const g = gesture.current;
-		if (!g || g.pid !== e.pointerId) return;
-		gesture.current = null;
-		const dx = e.clientX - g.x;
-		if (Math.abs(dx) > SWIPE_PX) {
-			const direction = dx > 0 ? "right" : "left";
-			setFling(direction);
-			setDrag((d) => ({ ...d, active: false }));
-			timer.current = setTimeout(() => onFling(direction), 250);
-			return;
+	flingTo: (direction: Direction) => void,
+) {
+	const seen = useRef(0);
+	useEffect(() => {
+		if (signal && signal.n !== seen.current && !fling) {
+			seen.current = signal.n;
+			flingTo(signal.direction);
 		}
-		setSnapping(true);
-		setDrag({ x: 0, y: 0, active: false });
-		timer.current = setTimeout(() => setSnapping(false), 200);
-	};
-
-	const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-		if (fling) return;
-		e.currentTarget.setPointerCapture(e.pointerId);
-		gesture.current = { x: e.clientX, y: e.clientY, pid: e.pointerId };
-		setSnapping(false);
-		setDrag({ x: 0, y: 0, active: true });
-	};
-
-	const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-		const g = gesture.current;
-		if (!g || g.pid !== e.pointerId) return;
-		setDrag({ x: e.clientX - g.x, y: e.clientY - g.y, active: true });
-	};
-
-	return { drag, fling, snapping, onPointerDown, onPointerMove, onPointerUp };
+	});
 }
 
 function DragCard({
 	game,
 	next,
+	signal,
 	onFling,
 }: {
 	game: GameCard;
 	next?: GameCard;
+	signal: FlingSignal;
 	onFling: (direction: Direction) => void;
 }) {
-	const { drag, fling, snapping, onPointerDown, onPointerMove, onPointerUp } =
+	const { drag, fling, flingTo, onPointerDown, onPointerMove, onPointerUp } =
 		useDragMachine(onFling);
-	const { transform, transition } = cardTransform(drag, fling, snapping);
+	useFlingSignal(signal, fling, flingTo);
+	const { transform, transition } = cardTransform(drag, fling);
 	const fade = 1 - Math.min(Math.abs(drag.x) / 500, 0.35);
 
 	return (
@@ -193,27 +147,57 @@ function DragCard({
 					<CardFace game={next} />
 				</div>
 			) : null}
-			<div
-				className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
-				style={{
-					transform,
-					transition,
-					opacity: fade,
-					willChange: "transform",
-				}}
+			<DraggableFace
+				game={game}
+				transform={transform}
+				transition={transition}
+				fade={fade}
+				play={Math.max(0, Math.min(1, drag.x / STAMP_PX))}
+				skip={Math.max(0, Math.min(1, -drag.x / STAMP_PX))}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={onPointerUp}
-				onPointerCancel={onPointerUp}
-			>
-				<div className="h-full animate-card-pop">
-					<CardFace game={game} />
-				</div>
-				<FlingStamps
-					play={Math.max(0, Math.min(1, drag.x / STAMP_PX))}
-					skip={Math.max(0, Math.min(1, -drag.x / STAMP_PX))}
-				/>
+			/>
+		</div>
+	);
+}
+
+type PointerHandler = (e: React.PointerEvent<HTMLDivElement>) => void;
+
+function DraggableFace({
+	game,
+	transform,
+	transition,
+	fade,
+	play,
+	skip,
+	onPointerDown,
+	onPointerMove,
+	onPointerUp,
+}: {
+	game: GameCard;
+	transform: string;
+	transition: string;
+	fade: number;
+	play: number;
+	skip: number;
+	onPointerDown: PointerHandler;
+	onPointerMove: PointerHandler;
+	onPointerUp: PointerHandler;
+}) {
+	return (
+		<div
+			className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
+			style={{ transform, transition, opacity: fade, willChange: "transform" }}
+			onPointerDown={onPointerDown}
+			onPointerMove={onPointerMove}
+			onPointerUp={onPointerUp}
+			onPointerCancel={onPointerUp}
+		>
+			<div className="h-full animate-card-pop">
+				<CardFace game={game} />
 			</div>
+			<FlingStamps play={play} skip={skip} />
 		</div>
 	);
 }
@@ -221,9 +205,9 @@ function DragCard({
 function CardFace({ game }: { game: GameCard }) {
 	return (
 		<article className="relative h-full w-full overflow-hidden rounded-tile bg-surface">
-			{game.thumbnail ? (
+			{(game.image ?? game.thumbnail) ? (
 				<img
-					src={game.thumbnail}
+					src={(game.image ?? game.thumbnail) as string}
 					alt={`${game.name} box art`}
 					draggable={false}
 					className="absolute inset-0 h-full w-full object-cover"

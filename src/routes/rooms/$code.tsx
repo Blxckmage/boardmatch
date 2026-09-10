@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, PillTag } from "#/components/ui";
+import { Button, Field } from "#/components/ui";
 import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 import type { GameCard, ServerMsg } from "#/server/room-protocol";
 
@@ -84,7 +84,7 @@ function useRoomConnection(code: string) {
 
 function RoomPage() {
 	const { code } = Route.useParams();
-	const { phase, problem, name, players, deck, match, setName, join, swipe } =
+	const { phase, problem, name, deck, match, setName, join, swipe } =
 		useRoomConnection(code);
 
 	return (
@@ -94,7 +94,6 @@ function RoomPage() {
 				problem={problem}
 				name={name}
 				busy={phase === "joining"}
-				players={players}
 				deck={deck}
 				onName={setName}
 				onJoin={join}
@@ -110,7 +109,6 @@ export function PhaseView({
 	problem,
 	name,
 	busy,
-	players,
 	deck,
 	onName,
 	onJoin,
@@ -120,7 +118,6 @@ export function PhaseView({
 	problem: string | null;
 	name: string;
 	busy: boolean;
-	players: string[];
 	deck: GameCard[];
 	onName: (v: string) => void;
 	onJoin: () => void;
@@ -136,7 +133,7 @@ export function PhaseView({
 			</p>
 		);
 	}
-	return <RoomView players={players} deck={deck} onSwipe={onSwipe} />;
+	return <SwipeDeck deck={deck} onSwipe={onSwipe} />;
 }
 
 function JoinForm({
@@ -170,29 +167,6 @@ function JoinForm({
 				</Button>
 			</div>
 		</form>
-	);
-}
-
-function RoomView({
-	players,
-	deck,
-	onSwipe,
-}: {
-	players: string[];
-	deck: GameCard[];
-	onSwipe: (gameId: number, direction: "left" | "right") => void;
-}) {
-	return (
-		<>
-			<div className="mt-6 flex flex-wrap gap-2">
-				{players.map((p) => (
-					<PillTag key={p} tone="slate">
-						{p}
-					</PillTag>
-				))}
-			</div>
-			<SwipeDeck deck={deck} onSwipe={onSwipe} />
-		</>
 	);
 }
 
@@ -236,9 +210,9 @@ export function MatchOverlay({ game }: { game: GameCard }) {
 				<p className="font-mono text-xs uppercase tracking-[1.8px] text-black">
 					Match found
 				</p>
-				{game.thumbnail ? (
+				{(game.image ?? game.thumbnail) ? (
 					<img
-						src={game.thumbnail}
+						src={(game.image ?? game.thumbnail) as string}
 						alt=""
 						className="mx-auto mt-6 h-40 rounded-[4px] border border-black/20 object-cover"
 					/>
