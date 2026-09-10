@@ -51,22 +51,7 @@ function EntryChoices() {
 
 	return (
 		<section className="mx-auto mt-8 grid w-full max-w-2xl gap-6 md:grid-cols-2">
-			<form
-				onSubmit={join}
-				className="rounded-tile border border-white bg-canvas p-6"
-			>
-				<Field
-					label="Room code"
-					placeholder="e.g. KX7Q2M"
-					value={code}
-					onChange={(e) => setCode(e.target.value)}
-				/>
-				<div className="mt-6">
-					<Button type="submit" variant="primary" disabled={!code.trim()}>
-						Join room
-					</Button>
-				</div>
-			</form>
+			<JoinCard code={code} onCode={setCode} onJoin={join} />
 			<div className="rounded-tile border border-white bg-canvas p-6">
 				<p className="font-sans text-lg font-bold text-white">
 					Hosting tonight?
@@ -81,5 +66,34 @@ function EntryChoices() {
 				</div>
 			</div>
 		</section>
+	);
+}
+
+function JoinCard({
+	code,
+	onCode,
+	onJoin,
+}: {
+	code: string;
+	onCode: (v: string) => void;
+	onJoin: (e: FormEvent) => void;
+}) {
+	return (
+		<form
+			onSubmit={onJoin}
+			className="rounded-tile border border-white bg-canvas p-6"
+		>
+			<Field
+				label="Room code"
+				placeholder="e.g. KX7Q2M"
+				value={code}
+				onChange={(e) => onCode(e.target.value)}
+			/>
+			<div className="mt-6">
+				<Button type="submit" variant="primary" disabled={!code.trim()}>
+					Join room
+				</Button>
+			</div>
+		</form>
 	);
 }
