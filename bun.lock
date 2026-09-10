@@ -15,6 +15,7 @@
         "@tanstack/react-router": "latest",
         "@tanstack/react-router-devtools": "latest",
         "@tanstack/react-start": "^1.168.50",
+        "bgg-api-ts": "^1.0.0",
         "effect": "4.0.0-rc.112",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -721,6 +722,8 @@
     "baseline-browser-mapping": ["baseline-browser-mapping@2.11.21", "", { "bin": { "baseline-browser-mapping": "dist/cli.cjs" } }, "sha512-uh8vpY/1/YyFkunIDFH/12p7/7VdPKA1hejMVEbdkEaWnUz0Hesvx5EbiU6XxjyHZIOju+ZMbQJkRh+es3/spQ=="],
 
     "before-after-hook": ["before-after-hook@4.0.0", "", {}, "sha512-q6tR3RPqIB1pMiTRMFcZwuG5T8vwp+vUvEG0vuI6B+Rikh5BfPp2fQ82c925FOs+b0lcFQ8CFrL+KbilfZFhOQ=="],
+
+    "bgg-api-ts": ["bgg-api-ts@1.0.0", "", { "dependencies": { "fast-xml-parser": "^5.3.3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-afVapeRnZOXqk7tOEI0qYoUBaqHUCIbR37ir7m0fVVYpS8CEiStNouhsUGXxZ4bkJjtsiL1feZwOJeEbY/mzWg=="],
 
     "blake3-wasm": ["blake3-wasm@2.1.5", "", {}, "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="],
 

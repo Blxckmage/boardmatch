@@ -26,6 +26,7 @@
     "@tanstack/react-router": "latest",
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-start": "^1.168.50",
+    "bgg-api-ts": "^1.0.0",
     "effect": "4.0.0-rc.112",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
