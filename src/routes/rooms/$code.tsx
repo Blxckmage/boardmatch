@@ -6,6 +6,9 @@ import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 import type { GameCard, ServerMsg } from "#/server/room-protocol";
 
 export const Route = createFileRoute("/rooms/$code")({
+	validateSearch: (search: Record<string, unknown>) => ({
+		name: typeof search.name === "string" ? search.name : undefined,
+	}),
 	component: RoomPage,
 });
 
@@ -38,7 +41,20 @@ const connectRoom = (code: string, name: string, events: RoomEvents) => {
 	return ws;
 };
 
-function useRoomConnection(code: string) {
+function useAutoJoin(
+	autoName: string | undefined,
+	join: (asName?: string) => void,
+) {
+	const didAuto = useRef(false);
+	useEffect(() => {
+		if (autoName && !didAuto.current) {
+			didAuto.current = true;
+			join(autoName);
+		}
+	});
+}
+
+function useRoomConnection(code: string, autoName?: string) {
 	const [phase, setPhase] = useState<Phase>("name");
 	const [name, setName] = useState("");
 	const [players, setPlayers] = useState<string[]>([]);
@@ -55,8 +71,8 @@ function useRoomConnection(code: string) {
 		[],
 	);
 
-	const join = () => {
-		const trimmed = name.trim();
+	const join = (asName?: string) => {
+		const trimmed = (asName ?? name).trim();
 		if (!trimmed) return;
 		setPhase("joining");
 		setProblem(null);
@@ -75,6 +91,8 @@ function useRoomConnection(code: string) {
 		});
 	};
 
+	useAutoJoin(autoName, join);
+
 	const swipe = (gameId: number, direction: Direction) => {
 		socket.current?.send(JSON.stringify({ type: "swipe", gameId, direction }));
 	};
@@ -84,8 +102,9 @@ function useRoomConnection(code: string) {
 
 function RoomPage() {
 	const { code } = Route.useParams();
+	const { name: autoName } = Route.useSearch();
 	const { phase, problem, name, deck, match, setName, join, swipe } =
-		useRoomConnection(code);
+		useRoomConnection(code, autoName);
 
 	return (
 		<div className="py-12 md:py-16">

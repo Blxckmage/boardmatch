@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CreateRouteImport } from './routes/create'
 import { Route as DevStatesRouteImport } from './routes/dev/states'
 import { Route as DevSwipeRouteImport } from './routes/dev/swipe'
 import { Route as RoomsCodeRouteImport } from './routes/rooms/$code'
@@ -18,6 +19,11 @@ import { Route as ApiRoomsCodeRouteImport } from './routes/api/rooms/$code'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateRoute = CreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevStatesRoute = DevStatesRouteImport.update({
@@ -43,6 +49,7 @@ const ApiRoomsCodeRoute = ApiRoomsCodeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -66,12 +75,24 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/dev/states' | '/dev/swipe' | '/rooms/$code' | '/api/rooms/$code'
+    | '/'
+    | '/create'
+    | '/dev/states'
+    | '/dev/swipe'
+    | '/rooms/$code'
+    | '/api/rooms/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/states' | '/dev/swipe' | '/rooms/$code' | '/api/rooms/$code'
+  to:
+    | '/'
+    | '/create'
+    | '/dev/states'
+    | '/dev/swipe'
+    | '/rooms/$code'
+    | '/api/rooms/$code'
   id:
     | '__root__'
     | '/'
+    | '/create'
     | '/dev/states'
     | '/dev/swipe'
     | '/rooms/$code'
@@ -80,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreateRoute: typeof CreateRoute
   DevStatesRoute: typeof DevStatesRoute
   DevSwipeRoute: typeof DevSwipeRoute
   RoomsCodeRoute: typeof RoomsCodeRoute
@@ -93,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create': {
+      id: '/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof CreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/states': {
@@ -128,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreateRoute: CreateRoute,
   DevStatesRoute: DevStatesRoute,
   DevSwipeRoute: DevSwipeRoute,
   RoomsCodeRoute: RoomsCodeRoute,
