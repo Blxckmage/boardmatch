@@ -8,5 +8,11 @@
 		"style": "off",
 		"nursery": "off",
 		"restriction": "off"
-	}
+	},
+	"overrides": [
+		{
+			"files": ["src/server/room.ts"],
+			"rules": { "max-lines-per-function": "off" }
+		}
+	]
 }

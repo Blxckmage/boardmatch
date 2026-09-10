@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { type FormEvent, useState } from "react";
 
 import { Button, Field, PillTag, StoryTile } from "#/components/ui";
+import { CreateRoomButton } from "#/components/create-room-button";
 import {
 	type CollectionGame,
 	fetchCollection,
@@ -225,7 +226,12 @@ function CollectionOutput({
 					{error}
 				</p>
 			)}
-			{!error && total !== null && <ResultsList games={games} total={total} />}
+			{!error && total !== null && (
+				<>
+					<ResultsList games={games} total={total} />
+					<CreateRoomButton games={games} />
+				</>
+			)}
 		</>
 	);
 }

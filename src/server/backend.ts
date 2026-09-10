@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import { HttpServerRequest } from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import Room from "./room.ts";
+import type { GameCard } from "./room-protocol.ts";
 
 export default Cloudflare.Worker(
 	"Backend",
@@ -15,15 +16,20 @@ export default Cloudflare.Worker(
 				const request = yield* HttpServerRequest;
 
 				if (request.url.startsWith("/room/")) {
-					if (request.headers.upgrade !== "websocket") {
-						return HttpServerResponse.text("Expected Upgrade: websocket", {
-							status: 426,
-						});
-					}
 					const id = request.url.split("/").pop();
 					if (!id) {
 						return HttpServerResponse.text("Missing room id", {
 							status: 400,
+						});
+					}
+					if (request.method === "POST" && request.url.endsWith("/init")) {
+						const deck = (yield* request.json) as GameCard[];
+						const count = yield* rooms.getByName(id).initDeck(deck);
+						return yield* HttpServerResponse.json({ ok: true, games: count });
+					}
+					if (request.headers.upgrade !== "websocket") {
+						return HttpServerResponse.text("Expected Upgrade: websocket", {
+							status: 426,
 						});
 					}
 					return yield* rooms.getByName(id).fetch(request);
