@@ -3,7 +3,7 @@
 1. `.docs/` is source of truth: on EVERY task, `Read` `.docs/` dir first, then read every file in it before touching code.
 2. fff MCP ONLY for search: `fff_grep` = file contents (bare identifiers only, one per query), `fff_find_files` = find files/modules, `fff_multi_grep` = 2+ identifiers at once (OR logic). NEVER `bash` for `grep/rg/find/cat/head/tail/sed/awk/echo`; NEVER `Glob`/`Grep` when an fff tool fits. After 2 greps, READ the top hit — no more grep variations.
 3. `Read` to read, `Edit` to edit, `Write` for new files only. No new docs/abstractions/deps unless asked. No code comments except `// NOTE:`.
-4. Linear is the todo list: `Boardmatch` project, team `BLA` — pull its Backlog before starting, work bottom-up (Urgent foundation first), one branch per issue named `dev/bla-<id>-<short-slug>`, auto-commit conventional (`type(scope): subject`, `Refs: BLA-<id>` trailer), set In Progress on start and Done + comment on finish. Stack lives in `.docs/ARCHITECTURE.md`, never mirrored here.
+4. Linear is the todo list: `Boardmatch` project, team `BLA` — pull its Backlog before starting, work bottom-up (Urgent foundation first), one branch per issue named `dev/bla-<id>-<short-slug>`, auto-commit conventional (`type(scope): subject`, `Refs: BLA-<id>` trailer), smoke (`check` + `build` green) before every merge, set In Progress on start and Done + comment on finish. Stack lives in `.docs/ARCHITECTURE.md`, never mirrored here.
 5. Effect: `Effect.gen` body = happy path only, `.pipe()` = all error handling; typed errors, `Schedule` retries, no raw try/catch in server code. Method: `.docs/DESIGN-SYSTEM/DESIGN_THINKING.md`.
 
 <!-- intent-skills:start -->
