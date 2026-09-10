@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Field, PillTag } from "#/components/ui";
+import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 import type { GameCard, ServerMsg } from "#/server/room-protocol";
 
 export const Route = createFileRoute("/rooms/$code")({
@@ -74,12 +75,16 @@ function useRoomConnection(code: string) {
 		});
 	};
 
-	return { phase, problem, name, players, deck, match, setName, join };
+	const swipe = (gameId: number, direction: Direction) => {
+		socket.current?.send(JSON.stringify({ type: "swipe", gameId, direction }));
+	};
+
+	return { phase, problem, name, players, deck, match, setName, join, swipe };
 }
 
 function RoomPage() {
 	const { code } = Route.useParams();
-	const { phase, problem, name, players, deck, match, setName, join } =
+	const { phase, problem, name, players, deck, match, setName, join, swipe } =
 		useRoomConnection(code);
 
 	return (
@@ -96,6 +101,7 @@ function RoomPage() {
 				deck={deck}
 				onName={setName}
 				onJoin={join}
+				onSwipe={swipe}
 			/>
 			{match ? <MatchOverlay game={match} /> : null}
 		</div>
@@ -111,6 +117,7 @@ function PhaseView({
 	deck,
 	onName,
 	onJoin,
+	onSwipe,
 }: {
 	phase: Phase;
 	problem: string | null;
@@ -120,6 +127,7 @@ function PhaseView({
 	deck: GameCard[];
 	onName: (v: string) => void;
 	onJoin: () => void;
+	onSwipe: (gameId: number, direction: "left" | "right") => void;
 }) {
 	if (phase === "name" || phase === "joining") {
 		return <JoinForm name={name} busy={busy} onName={onName} onJoin={onJoin} />;
@@ -131,7 +139,7 @@ function PhaseView({
 			</p>
 		);
 	}
-	return <RoomView players={players} deck={deck} />;
+	return <RoomView players={players} deck={deck} onSwipe={onSwipe} />;
 }
 
 function JoinForm({
@@ -168,7 +176,15 @@ function JoinForm({
 	);
 }
 
-function RoomView({ players, deck }: { players: string[]; deck: GameCard[] }) {
+function RoomView({
+	players,
+	deck,
+	onSwipe,
+}: {
+	players: string[];
+	deck: GameCard[];
+	onSwipe: (gameId: number, direction: "left" | "right") => void;
+}) {
 	return (
 		<>
 			<div className="mt-6 flex flex-wrap gap-2">
@@ -178,21 +194,7 @@ function RoomView({ players, deck }: { players: string[]; deck: GameCard[] }) {
 					</PillTag>
 				))}
 			</div>
-			<p className="font-mono mt-8 text-xs uppercase tracking-[1.8px] text-fog">
-				{deck.length} games in the deck
-			</p>
-			<ul className="mt-4 space-y-2">
-				{deck.map((game) => (
-					<li
-						key={game.id}
-						className="rounded-tile border border-white bg-canvas px-5 py-3"
-					>
-						<p className="font-sans text-lg font-bold text-white">
-							{game.name}
-						</p>
-					</li>
-				))}
-			</ul>
+			<SwipeDeck deck={deck} onSwipe={onSwipe} />
 		</>
 	);
 }
