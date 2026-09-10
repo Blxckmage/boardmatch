@@ -37,3 +37,26 @@ export const fetchUserCollection = (client: BggClient, username: string) =>
 
 export const makeClient = (token: string) =>
 	new BggClient("https://boardgamegeek.com/xmlapi2/", token);
+
+const NAMED_ENTITIES: Record<string, string> = {
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	nbsp: " ",
+};
+
+// NOTE: bgg-api-ts leaves XML entities encoded in text nodes.
+export const decodeEntities = (value: string): string =>
+	value
+		.replaceAll(/&#(\d+);/gu, (_, code: string) =>
+			String.fromCodePoint(Number(code)),
+		)
+		.replaceAll(/&#x([0-9a-fA-F]+);/gu, (_, hex: string) =>
+			String.fromCodePoint(Number.parseInt(hex, 16)),
+		)
+		.replaceAll(
+			/&(amp|lt|gt|quot|apos|nbsp);/gu,
+			(match: string, name: string) => NAMED_ENTITIES[name] ?? match,
+		);
