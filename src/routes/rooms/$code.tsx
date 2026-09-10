@@ -1,0 +1,264 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { Button, Field, PillTag } from "#/components/ui";
+import type { GameCard, ServerMsg } from "#/server/room-protocol";
+
+export const Route = createFileRoute("/rooms/$code")({
+	component: RoomPage,
+});
+
+type Phase = "name" | "joining" | "room" | "error";
+
+type RoomEvents = {
+	onJoined: (deck: GameCard[], players: string[]) => void;
+	onPlayers: (players: string[]) => void;
+	onMatch: (game: GameCard) => void;
+	onError: () => void;
+};
+
+const wsUrl = (code: string) => {
+	const proto = window.location.protocol === "https:" ? "wss" : "ws";
+	return `${proto}://${window.location.host}/api/rooms/${code}`;
+};
+
+const connectRoom = (code: string, name: string, events: RoomEvents) => {
+	const ws = new WebSocket(wsUrl(code));
+	ws.addEventListener("open", () => {
+		ws.send(JSON.stringify({ type: "join", name }));
+	});
+	ws.addEventListener("message", (event) => {
+		const msg = JSON.parse(event.data as string) as ServerMsg;
+		if (msg.type === "joined") events.onJoined(msg.deck, msg.players);
+		else if (msg.type === "players") events.onPlayers(msg.players);
+		else if (msg.type === "match") events.onMatch(msg.game);
+	});
+	ws.addEventListener("error", events.onError);
+	return ws;
+};
+
+function useRoomConnection(code: string) {
+	const [phase, setPhase] = useState<Phase>("name");
+	const [name, setName] = useState("");
+	const [players, setPlayers] = useState<string[]>([]);
+	const [deck, setDeck] = useState<GameCard[]>([]);
+	const [match, setMatch] = useState<GameCard | null>(null);
+	const [problem, setProblem] = useState<string | null>(null);
+	const socket = useRef<WebSocket | null>(null);
+
+	useEffect(
+		() => () => {
+			socket.current?.close();
+			socket.current = null;
+		},
+		[],
+	);
+
+	const join = () => {
+		const trimmed = name.trim();
+		if (!trimmed) return;
+		setPhase("joining");
+		setProblem(null);
+		socket.current = connectRoom(code, trimmed, {
+			onJoined: (nextDeck, nextPlayers) => {
+				setDeck(nextDeck);
+				setPlayers(nextPlayers);
+				setPhase("room");
+			},
+			onPlayers: setPlayers,
+			onMatch: setMatch,
+			onError: () => {
+				setProblem("Connection failed — the room needs workerd.");
+				setPhase("error");
+			},
+		});
+	};
+
+	return { phase, problem, name, players, deck, match, setName, join };
+}
+
+function RoomPage() {
+	const { code } = Route.useParams();
+	const { phase, problem, name, players, deck, match, setName, join } =
+		useRoomConnection(code);
+
+	return (
+		<div className="py-12 md:py-16">
+			<p className="font-mono text-xs uppercase tracking-[1.8px] text-mint">
+				Room {code}
+			</p>
+			<PhaseView
+				phase={phase}
+				problem={problem}
+				name={name}
+				busy={phase === "joining"}
+				players={players}
+				deck={deck}
+				onName={setName}
+				onJoin={join}
+			/>
+			{match ? <MatchOverlay game={match} /> : null}
+		</div>
+	);
+}
+
+function PhaseView({
+	phase,
+	problem,
+	name,
+	busy,
+	players,
+	deck,
+	onName,
+	onJoin,
+}: {
+	phase: Phase;
+	problem: string | null;
+	name: string;
+	busy: boolean;
+	players: string[];
+	deck: GameCard[];
+	onName: (v: string) => void;
+	onJoin: () => void;
+}) {
+	if (phase === "name" || phase === "joining") {
+		return <JoinForm name={name} busy={busy} onName={onName} onJoin={onJoin} />;
+	}
+	if (phase === "error") {
+		return (
+			<p className="font-mono mt-6 text-xs uppercase tracking-[1.5px] text-white">
+				{problem}
+			</p>
+		);
+	}
+	return <RoomView players={players} deck={deck} />;
+}
+
+function JoinForm({
+	name,
+	busy,
+	onName,
+	onJoin,
+}: {
+	name: string;
+	busy: boolean;
+	onName: (v: string) => void;
+	onJoin: () => void;
+}) {
+	return (
+		<form
+			className="mt-6 max-w-sm"
+			onSubmit={(e) => {
+				e.preventDefault();
+				onJoin();
+			}}
+		>
+			<Field
+				label="Display name"
+				placeholder="e.g. Faza"
+				value={name}
+				onChange={(e) => onName(e.target.value)}
+			/>
+			<div className="mt-6">
+				<Button variant="primary" disabled={busy || !name.trim()}>
+					{busy ? "Joining…" : "Join room"}
+				</Button>
+			</div>
+		</form>
+	);
+}
+
+function RoomView({ players, deck }: { players: string[]; deck: GameCard[] }) {
+	return (
+		<>
+			<div className="mt-6 flex flex-wrap gap-2">
+				{players.map((p) => (
+					<PillTag key={p} tone="slate">
+						{p}
+					</PillTag>
+				))}
+			</div>
+			<p className="font-mono mt-8 text-xs uppercase tracking-[1.8px] text-fog">
+				{deck.length} games in the deck
+			</p>
+			<ul className="mt-4 space-y-2">
+				{deck.map((game) => (
+					<li
+						key={game.id}
+						className="rounded-tile border border-white bg-canvas px-5 py-3"
+					>
+						<p className="font-sans text-lg font-bold text-white">
+							{game.name}
+						</p>
+					</li>
+				))}
+			</ul>
+		</>
+	);
+}
+
+const CONFETTI_TONES = ["#3cffd0", "#5200ff", "#ffffff"];
+
+function Confetti() {
+	const pieces = useMemo(
+		() =>
+			Array.from({ length: 28 }, (_, i) => ({
+				left: (i * 37) % 100,
+				delay: (i % 7) * 0.35,
+				duration: 2.4 + (i % 5) * 0.4,
+				tone: CONFETTI_TONES[i % CONFETTI_TONES.length],
+			})),
+		[],
+	);
+	return (
+		<>
+			<style>{`@keyframes bm-fall{to{transform:translateY(110vh) rotate(540deg)}}`}</style>
+			{pieces.map((p, i) => (
+				<span
+					// NOTE: decorative only, stable order
+					key={i}
+					className="absolute top-[-5vh] h-3 w-2"
+					style={{
+						left: `${p.left}%`,
+						background: p.tone,
+						animation: `bm-fall ${p.duration}s linear ${p.delay}s infinite`,
+					}}
+				/>
+			))}
+		</>
+	);
+}
+
+function MatchOverlay({ game }: { game: GameCard }) {
+	return (
+		<div className="fixed inset-0 z-50 overflow-hidden bg-black/80">
+			<Confetti />
+			<div className="relative mx-auto mt-24 max-w-md rounded-tile border border-transparent bg-mint p-8 text-center md:p-10">
+				<p className="font-mono text-xs uppercase tracking-[1.8px] text-black">
+					Match found
+				</p>
+				{game.thumbnail ? (
+					<img
+						src={game.thumbnail}
+						alt=""
+						className="mx-auto mt-6 h-40 rounded-[4px] border border-black/20 object-cover"
+					/>
+				) : null}
+				<h2 className="mt-6 font-sans text-2xl font-bold leading-none text-black">
+					Tonight you&apos;re playing: {game.name}
+				</h2>
+				<p className="font-mono mt-6 text-[11px] uppercase tracking-[1.1px] text-black/70">
+					Powered by{" "}
+					<a
+						href="https://boardgamegeek.com"
+						target="_blank"
+						rel="noreferrer"
+						className="underline"
+					>
+						BoardGameGeek
+					</a>
+				</p>
+			</div>
+		</div>
+	);
+}

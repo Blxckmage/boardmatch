@@ -16,7 +16,8 @@ export default Cloudflare.Worker(
 				const request = yield* HttpServerRequest;
 
 				if (request.url.startsWith("/room/")) {
-					const id = request.url.split("/").pop();
+					// NOTE: /room/:id or /room/:id/init — pop() would grab "init".
+					const id = request.url.split("/")[2];
 					if (!id) {
 						return HttpServerResponse.text("Missing room id", {
 							status: 400,
