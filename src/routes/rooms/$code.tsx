@@ -108,7 +108,7 @@ function RoomPage() {
 	);
 }
 
-function PhaseView({
+export function PhaseView({
 	phase,
 	problem,
 	name,
@@ -231,7 +231,7 @@ function Confetti() {
 	);
 }
 
-function MatchOverlay({ game }: { game: GameCard }) {
+export function MatchOverlay({ game }: { game: GameCard }) {
 	return (
 		<div className="fixed inset-0 z-50 overflow-hidden bg-black/80">
 			<Confetti />

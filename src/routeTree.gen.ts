@@ -10,12 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DevStatesRouteImport } from './routes/dev/states'
+import { Route as DevSwipeRouteImport } from './routes/dev/swipe'
 import { Route as RoomsCodeRouteImport } from './routes/rooms/$code'
 import { Route as ApiRoomsCodeRouteImport } from './routes/api/rooms/$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevStatesRoute = DevStatesRouteImport.update({
+  id: '/dev/states',
+  path: '/dev/states',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevSwipeRoute = DevSwipeRouteImport.update({
+  id: '/dev/swipe',
+  path: '/dev/swipe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoomsCodeRoute = RoomsCodeRouteImport.update({
@@ -31,30 +43,45 @@ const ApiRoomsCodeRoute = ApiRoomsCodeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dev/states': typeof DevStatesRoute
+  '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
   '/api/rooms/$code': typeof ApiRoomsCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dev/states': typeof DevStatesRoute
+  '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
   '/api/rooms/$code': typeof ApiRoomsCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dev/states': typeof DevStatesRoute
+  '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
   '/api/rooms/$code': typeof ApiRoomsCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/rooms/$code' | '/api/rooms/$code'
+  fullPaths:
+    '/' | '/dev/states' | '/dev/swipe' | '/rooms/$code' | '/api/rooms/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/rooms/$code' | '/api/rooms/$code'
-  id: '__root__' | '/' | '/rooms/$code' | '/api/rooms/$code'
+  to: '/' | '/dev/states' | '/dev/swipe' | '/rooms/$code' | '/api/rooms/$code'
+  id:
+    | '__root__'
+    | '/'
+    | '/dev/states'
+    | '/dev/swipe'
+    | '/rooms/$code'
+    | '/api/rooms/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DevStatesRoute: typeof DevStatesRoute
+  DevSwipeRoute: typeof DevSwipeRoute
   RoomsCodeRoute: typeof RoomsCodeRoute
   ApiRoomsCodeRoute: typeof ApiRoomsCodeRoute
 }
@@ -66,6 +93,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/states': {
+      id: '/dev/states'
+      path: '/dev/states'
+      fullPath: '/dev/states'
+      preLoaderRoute: typeof DevStatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/swipe': {
+      id: '/dev/swipe'
+      path: '/dev/swipe'
+      fullPath: '/dev/swipe'
+      preLoaderRoute: typeof DevSwipeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rooms/$code': {
@@ -87,6 +128,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DevStatesRoute: DevStatesRoute,
+  DevSwipeRoute: DevSwipeRoute,
   RoomsCodeRoute: RoomsCodeRoute,
   ApiRoomsCodeRoute: ApiRoomsCodeRoute,
 }
