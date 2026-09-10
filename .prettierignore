@@ -1,0 +1,5 @@
+# build output, local state, generated files, source-of-truth docs
+dist
+.alchemy
+src/routeTree.gen.ts
+.docs
