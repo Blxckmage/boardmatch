@@ -6,6 +6,14 @@
 4. Linear is the todo list: `Boardmatch` project, team `BLA` — pull its Backlog before starting, work bottom-up (Urgent foundation first), one branch per issue named `dev/bla-<id>-<short-slug>`, auto-commit conventional (`type(scope): subject`, `Refs: BLA-<id>` trailer), smoke (`check` + `build` green) before every merge, set In Progress on start and Done + comment on finish. Stack lives in `.docs/ARCHITECTURE.md`, never mirrored here.
 5. Effect: `Effect.gen` body = happy path only, `.pipe()` = all error handling; typed errors, `Schedule` retries, no raw try/catch in server code. Method: `.docs/DESIGN-SYSTEM/DESIGN_THINKING.md`.
 
+## Call graph answers
+
+For flow, path, trace, caller, architecture, and how-it-works questions,
+use the `call-graph` skill when available. Lead with a plain-text hierarchical
+call graph in a `ts` fence. Use two-space-indented `→` children. Show Production
+always and Tests only when they differ. Include verified `path:line` evidence
+for every node. Skip graph for trivial single-fact questions.
+
 <!-- intent-skills:start -->
 
 # TanStack Intent - before editing files, run the matching guidance command.

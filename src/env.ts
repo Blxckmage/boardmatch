@@ -4,6 +4,7 @@ import { z } from "zod";
 export const env = createEnv({
 	server: {
 		SERVER_URL: z.string().url().optional(),
+		BGG_TOKEN: z.string().min(1).optional(),
 	},
 
 	/**
