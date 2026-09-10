@@ -7,11 +7,22 @@ export type GameCard = {
 
 export type ClientMsg =
 	| { type: "join"; name: string }
-	| { type: "swipe"; gameId: number; direction: "left" | "right" };
+	| { type: "swipe"; gameId: number; direction: "left" | "right" }
+	| { type: "start" };
+
+export type RoomPlayer = { id: string; name: string };
 
 export type ServerMsg =
-	| { type: "joined"; deck: GameCard[]; players: string[] }
-	| { type: "players"; players: string[] }
+	| {
+			type: "joined";
+			you: string;
+			deck: GameCard[];
+			players: RoomPlayer[];
+			host: string | null;
+			started: boolean;
+	  }
+	| { type: "players"; players: RoomPlayer[]; host: string | null }
+	| { type: "start"; deck: GameCard[] }
 	| { type: "match"; game: GameCard };
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

@@ -3,12 +3,16 @@ import * as Effect from "effect/Effect";
 import {
 	type ClientMsg,
 	type GameCard,
+	type RoomPlayer,
 	type ServerMsg,
 	checkMatch,
 } from "./room-protocol.ts";
 
 type Sessions = Map<string, Cloudflare.WebSocket>;
 type Names = Map<string, string>;
+
+const listPlayers = (names: Names): RoomPlayer[] =>
+	[...names.entries()].map(([id, name]) => ({ id, name }));
 
 const send = (socket: Cloudflare.WebSocket, msg: ServerMsg) =>
 	socket.send(JSON.stringify(msg));
@@ -26,21 +30,23 @@ const registerJoin = (
 	deck: GameCard[],
 	socket: Cloudflare.WebSocket,
 	name: string,
+	host: string | null,
+	started: boolean,
 ) =>
 	Effect.gen(function* () {
 		const attachment = socket.deserializeAttachment<{ id: string }>();
-		if (!attachment) return;
+		if (!attachment) return null;
 		sessions.set(attachment.id, socket);
 		names.set(attachment.id, name);
 		yield* send(socket, {
 			type: "joined",
-			deck,
-			players: [...names.values()],
+			you: attachment.id,
+			deck: started ? deck : [],
+			players: listPlayers(names),
+			host,
+			started,
 		});
-		yield* broadcast(sessions, {
-			type: "players",
-			players: [...names.values()],
-		});
+		return attachment.id;
 	});
 
 const handleClose = (sessions: Sessions, names: Names) =>
@@ -49,10 +55,6 @@ const handleClose = (sessions: Sessions, names: Names) =>
 		if (attachment) {
 			sessions.delete(attachment.id);
 			names.delete(attachment.id);
-			yield* broadcast(sessions, {
-				type: "players",
-				players: [...names.values()],
-			});
 		}
 		yield* ws.close(code, reason);
 	});
@@ -69,6 +71,7 @@ const isClientMsg = (value: unknown): value is ClientMsg => {
 	if (typeof value !== "object" || value === null) return false;
 	const msg = value as Record<string, unknown>;
 	if (msg.type === "join") return typeof msg.name === "string";
+	if (msg.type === "start") return true;
 	if (msg.type === "swipe")
 		return (
 			typeof msg.gameId === "number" &&
@@ -106,6 +109,8 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 			let closed: GameCard | null = closedJson
 				? (JSON.parse(closedJson) as GameCard)
 				: null;
+			let host: string | null = null;
+			let started = (yield* readKey("started")) === "1";
 			const sessions: Sessions = new Map();
 			const names: Names = new Map();
 			for (const socket of yield* state.getWebSockets()) {
@@ -121,11 +126,13 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							JSON.stringify(next),
 						);
 						yield* state.storage.sql.exec(
-							"DELETE FROM room WHERE key = 'closed'",
+							"DELETE FROM room WHERE key IN ('closed', 'started')",
 						);
 						deck.length = 0;
 						deck.push(...next);
 						closed = null;
+						host = null;
+						started = false;
 						return deck.length;
 					}),
 				fetch: Effect.gen(function* () {
@@ -145,10 +152,43 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					});
 					if (!isClientMsg(parsed)) return;
 					if (parsed.type === "join") {
-						yield* registerJoin(sessions, names, deck, socket, parsed.name);
+						const pre = socket.deserializeAttachment<{ id: string }>();
+						if (pre && !host) host = pre.id;
+						const id = yield* registerJoin(
+							sessions,
+							names,
+							deck,
+							socket,
+							parsed.name,
+							host,
+							started,
+						);
+						if (!id) return;
+						yield* broadcast(sessions, {
+							type: "players",
+							players: listPlayers(names),
+							host,
+						});
 						return;
 					}
-					if (closed) return;
+					if (parsed.type === "start") {
+						const attachment = socket.deserializeAttachment<{ id: string }>();
+						if (
+							!attachment ||
+							attachment.id !== host ||
+							started ||
+							names.size < 2
+						) {
+							return;
+						}
+						started = true;
+						yield* state.storage.sql.exec(
+							"INSERT OR REPLACE INTO room (key, value) VALUES ('started', '1')",
+						);
+						yield* broadcast(sessions, { type: "start", deck });
+						return;
+					}
+					if (!started || closed) return;
 					const attachment = socket.deserializeAttachment<{ id: string }>();
 					const name = attachment ? names.get(attachment.id) : undefined;
 					if (!attachment || !name) return;
@@ -183,7 +223,17 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					code: number,
 					reason: string,
 				) {
+					const attachment = ws.deserializeAttachment<{ id: string }>();
 					yield* onClose(ws, code, reason);
+					if (!attachment) return;
+					if (attachment.id === host) {
+						host = [...names.keys()][0] ?? null;
+					}
+					yield* broadcast(sessions, {
+						type: "players",
+						players: listPlayers(names),
+						host,
+					});
 				}),
 			};
 		});
