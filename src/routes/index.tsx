@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
 	return (
-		<div className="py-12 md:py-16">
+		<div className="flex min-h-dvh flex-col items-center justify-center py-8">
 			<SiteHero />
 			<EntryChoices />
 		</div>
@@ -42,7 +42,7 @@ function EntryChoices() {
 	};
 
 	return (
-		<section className="mx-auto mt-12 grid max-w-2xl gap-6 md:grid-cols-2">
+		<section className="mx-auto mt-8 grid w-full max-w-2xl gap-6 md:grid-cols-2">
 			<form
 				onSubmit={join}
 				className="rounded-tile border border-white bg-canvas p-6"
