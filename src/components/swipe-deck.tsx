@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Button, PillTag } from "#/components/ui";
 import type { GameCard } from "#/server/room-protocol";
 
 export type Direction = "left" | "right";
@@ -50,10 +49,7 @@ export function SwipeDeck({
 	}
 
 	return (
-		<div className="mt-8 max-w-sm">
-			<PillTag tone="mint">
-				{index + 1} of {deck.length}
-			</PillTag>
+		<div className="mx-auto mt-8 w-full max-w-sm">
 			<DragCard
 				key={game.id}
 				game={game}
@@ -76,13 +72,23 @@ function DeckButtons({
 	onPlay: () => void;
 }) {
 	return (
-		<div className="mt-6 flex gap-3">
-			<Button variant="secondary" onClick={onSkip}>
-				Skip
-			</Button>
-			<Button variant="primary" onClick={onPlay}>
-				I&apos;d play this
-			</Button>
+		<div className="relative z-10 -mt-8 flex justify-center gap-6">
+			<button
+				type="button"
+				onClick={onSkip}
+				aria-label="Skip"
+				className="h-16 w-16 rounded-full bg-surface font-sans text-2xl font-bold text-bone"
+			>
+				✕
+			</button>
+			<button
+				type="button"
+				onClick={onPlay}
+				aria-label="I'd play this"
+				className="h-16 w-16 rounded-full bg-mint font-sans text-2xl font-bold text-black"
+			>
+				✓
+			</button>
 		</div>
 	);
 }
@@ -175,9 +181,10 @@ function DragCard({
 	const { drag, fling, snapping, onPointerDown, onPointerMove, onPointerUp } =
 		useDragMachine(onFling);
 	const { transform, transition } = cardTransform(drag, fling, snapping);
+	const fade = 1 - Math.min(Math.abs(drag.x) / 500, 0.35);
 
 	return (
-		<div className="relative mt-4 min-h-[420px] w-full select-none [height:62dvh]">
+		<div className="relative min-h-[480px] w-full select-none [height:68dvh]">
 			{next ? (
 				<div
 					aria-hidden
@@ -188,7 +195,12 @@ function DragCard({
 			) : null}
 			<div
 				className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
-				style={{ transform, transition, willChange: "transform" }}
+				style={{
+					transform,
+					transition,
+					opacity: fade,
+					willChange: "transform",
+				}}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={onPointerUp}
@@ -208,16 +220,20 @@ function DragCard({
 
 function CardFace({ game }: { game: GameCard }) {
 	return (
-		<article className="flex h-full w-full flex-col overflow-hidden rounded-tile border border-white bg-canvas p-4">
+		<article className="relative h-full w-full overflow-hidden rounded-tile bg-surface">
 			{game.thumbnail ? (
 				<img
 					src={game.thumbnail}
 					alt={`${game.name} box art`}
 					draggable={false}
-					className="h-[70%] w-full rounded-[4px] object-cover"
+					className="absolute inset-0 h-full w-full object-cover"
 				/>
 			) : null}
-			<h3 className="mt-4 font-sans text-[28px] font-bold leading-tight text-white">
+			<div
+				aria-hidden
+				className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 to-transparent"
+			/>
+			<h3 className="absolute inset-x-0 bottom-0 p-6 pb-12 font-sans text-3xl font-bold leading-none text-white drop-shadow-lg">
 				{game.name}
 			</h3>
 		</article>
