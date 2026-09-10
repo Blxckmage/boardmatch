@@ -41,6 +41,10 @@ function EntryChoices() {
 		void navigate({ to: "/rooms/$code", params: { code: trimmed } });
 	};
 
+	const create = () => {
+		void navigate({ to: "/create" });
+	};
+
 	return (
 		<section className="mx-auto mt-8 grid w-full max-w-2xl gap-6 md:grid-cols-2">
 			<form
@@ -67,13 +71,10 @@ function EntryChoices() {
 					Fetch your collection, pick the pool
 				</p>
 				<div className="mt-6">
-					<Button variant="secondary" disabled={true}>
+					<Button variant="secondary" onClick={create}>
 						Create room
 					</Button>
 				</div>
-				<p className="font-mono mt-4 text-[11px] uppercase tracking-[1.1px] text-fog">
-					Host setup lands next
-				</p>
 			</div>
 		</section>
 	);
