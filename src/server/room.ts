@@ -1,6 +1,11 @@
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Effect from "effect/Effect";
-import type { ClientMsg, GameCard, ServerMsg } from "./room-protocol.ts";
+import {
+	type ClientMsg,
+	type GameCard,
+	type ServerMsg,
+	checkMatch,
+} from "./room-protocol.ts";
 
 type Sessions = Map<string, Cloudflare.WebSocket>;
 type Names = Map<string, string>;
@@ -58,6 +63,20 @@ const parseMessage = (message: string | ArrayBuffer): ClientMsg => {
 	return JSON.parse(text) as ClientMsg;
 };
 
+// NOTE: trust-at-boundary guard — malformed client input is ignored, never
+// a DO crash.
+const isClientMsg = (value: unknown): value is ClientMsg => {
+	if (typeof value !== "object" || value === null) return false;
+	const msg = value as Record<string, unknown>;
+	if (msg.type === "join") return typeof msg.name === "string";
+	if (msg.type === "swipe")
+		return (
+			typeof msg.gameId === "number" &&
+			(msg.direction === "left" || msg.direction === "right")
+		);
+	return false;
+};
+
 export default class Room extends Cloudflare.DurableObject<Room>()(
 	"Rooms",
 	Effect.gen(function* () {
@@ -69,13 +88,24 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 			yield* state.storage.sql.exec(
 				"CREATE TABLE IF NOT EXISTS room (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
 			);
-			const deckCursor = yield* state.storage.sql.exec(
-				"SELECT value FROM room WHERE key = 'deck'",
-			);
-			const deckRow = yield* deckCursor.one();
-			const deck: GameCard[] = deckRow
-				? (JSON.parse(deckRow.value as string) as GameCard[])
+			// NOTE: one() throws on empty — toArray() is the safe boot read.
+			const readKey = (key: string) =>
+				Effect.gen(function* () {
+					const cursor = yield* state.storage.sql.exec<{ value: string }>(
+						"SELECT value FROM room WHERE key = ?",
+						key,
+					);
+					const rows = yield* cursor.toArray();
+					return rows[0]?.value;
+				});
+			const deckJson = yield* readKey("deck");
+			const deck: GameCard[] = deckJson
+				? (JSON.parse(deckJson) as GameCard[])
 				: [];
+			const closedJson = yield* readKey("closed");
+			let closed: GameCard | null = closedJson
+				? (JSON.parse(closedJson) as GameCard)
+				: null;
 			const sessions: Sessions = new Map();
 			const names: Names = new Map();
 			for (const socket of yield* state.getWebSockets()) {
@@ -90,8 +120,12 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							"INSERT OR REPLACE INTO room (key, value) VALUES ('deck', ?)",
 							JSON.stringify(next),
 						);
+						yield* state.storage.sql.exec(
+							"DELETE FROM room WHERE key = 'closed'",
+						);
 						deck.length = 0;
 						deck.push(...next);
+						closed = null;
 						return deck.length;
 					}),
 				fetch: Effect.gen(function* () {
@@ -105,11 +139,16 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					socket: Cloudflare.WebSocket,
 					message: string | ArrayBuffer,
 				) {
-					const parsed = parseMessage(message);
+					const parsed = yield* Effect.try({
+						try: () => parseMessage(message),
+						catch: () => null,
+					});
+					if (!isClientMsg(parsed)) return;
 					if (parsed.type === "join") {
 						yield* registerJoin(sessions, names, deck, socket, parsed.name);
 						return;
 					}
+					if (closed) return;
 					const attachment = socket.deserializeAttachment<{ id: string }>();
 					const name = attachment ? names.get(attachment.id) : undefined;
 					if (!attachment || !name) return;
@@ -119,6 +158,25 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						parsed.gameId,
 						parsed.direction,
 					);
+					if (parsed.direction !== "right") return;
+					const voters = [...names.keys()];
+					const likesCursor = yield* state.storage.sql.exec<{
+						player: string;
+					}>(
+						"SELECT player FROM swipes WHERE game = ? AND direction = 'right'",
+						parsed.gameId,
+					);
+					const likedBy = (yield* likesCursor.toArray())
+						.map((row) => row.player)
+						.filter((player) => voters.includes(player));
+					const match = checkMatch(deck, parsed.gameId, likedBy, voters);
+					if (!match) return;
+					closed = match;
+					yield* state.storage.sql.exec(
+						"INSERT OR REPLACE INTO room (key, value) VALUES ('closed', ?)",
+						JSON.stringify(match),
+					);
+					yield* broadcast(sessions, { type: "match", game: match });
 				}),
 				webSocketClose: Effect.fn(function* (
 					ws: Cloudflare.WebSocket,
