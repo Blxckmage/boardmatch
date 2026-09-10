@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import * as Effect from "effect/Effect";
 import { z } from "zod";
+import { getEnv } from "#/cf-env";
 import { fetchUserCollection, makeClient } from "./bgg";
 
 const collectionQuery = z.object({
@@ -21,7 +22,10 @@ export type CollectionGame = {
 export const fetchCollection = createServerFn({ method: "POST" })
 	.validator(collectionQuery)
 	.handler(async ({ data }) => {
-		const token = process.env.BGG_TOKEN;
+		const token = await getEnv().then(
+			(env) => env.BGG_TOKEN ?? process.env.BGG_TOKEN,
+			() => process.env.BGG_TOKEN,
+		);
 		if (!token) {
 			throw new Error("BGG_TOKEN is not configured");
 		}
