@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import * as Effect from "effect/Effect";
 import { z } from "zod";
-import { fetchOwnedCollection, makeClient } from "./bgg";
+import { fetchUserCollection, makeClient } from "./bgg";
 
 const collectionQuery = z.object({
 	username: z.string().trim().min(1),
@@ -26,13 +26,15 @@ export const fetchCollection = createServerFn({ method: "POST" })
 			throw new Error("BGG_TOKEN is not configured");
 		}
 		const items = await Effect.runPromise(
-			fetchOwnedCollection(makeClient(token), data.username),
+			fetchUserCollection(makeClient(token), data.username),
 		).catch((cause) => {
 			throw new Error(`BGG collection failed: ${String(cause)}`);
 		});
 		const games: CollectionGame[] = [];
 		for (const item of items) {
-			const name = item.name[0]?.value;
+			const rawName = item.name[0] as
+				{ value?: string; "#text"?: string } | undefined;
+			const name = rawName?.value ?? rawName?.["#text"];
 			if (!name) continue;
 			const stats = item.stats;
 			if (

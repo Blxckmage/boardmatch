@@ -21,10 +21,10 @@ const toCollectionError = (cause: unknown) =>
 const isTransient = (e: BggCollectionError) =>
 	e.status === undefined || e.status === 429 || e.status >= 500;
 
-export const fetchOwnedCollection = (client: BggClient, username: string) =>
+export const fetchUserCollection = (client: BggClient, username: string) =>
 	Effect.gen(function* () {
 		const result = yield* Effect.tryPromise({
-			try: () => client.getCollection({ username, own: true }),
+			try: () => client.getCollection({ username, stats: true }),
 			catch: toCollectionError,
 		});
 		return result.items.item ?? [];
