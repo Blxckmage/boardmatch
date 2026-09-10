@@ -2,6 +2,7 @@ export type GameCard = {
 	id: number;
 	name: string;
 	thumbnail?: string;
+	image?: string;
 };
 
 export type ClientMsg =

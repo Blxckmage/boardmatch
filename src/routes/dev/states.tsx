@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { MatchOverlay, PhaseView } from "#/routes/rooms/$code";
-import { FIXTURE_DECK, FIXTURE_PLAYERS } from "#/components/dev-fixtures";
+import { FIXTURE_DECK } from "#/components/dev-fixtures";
 
 export const Route = createFileRoute("/dev/states")({
 	beforeLoad: () => {
@@ -20,7 +20,6 @@ function PhasePreview({
 	name = "",
 	busy = false,
 	problem = null,
-	players = [],
 	deck = [],
 }: {
 	title: string;
@@ -28,7 +27,6 @@ function PhasePreview({
 	name?: string;
 	busy?: boolean;
 	problem?: string | null;
-	players?: string[];
 	deck?: typeof FIXTURE_DECK;
 }) {
 	return (
@@ -39,7 +37,6 @@ function PhasePreview({
 				problem={problem}
 				name={name}
 				busy={busy}
-				players={players}
 				deck={deck}
 				onName={noop}
 				onJoin={noop}
@@ -67,12 +64,7 @@ function StatePreviews() {
 				phase="error"
 				problem="Connection failed — the room needs workerd."
 			/>
-			<PhasePreview
-				title="Room"
-				phase="room"
-				players={FIXTURE_PLAYERS}
-				deck={FIXTURE_DECK}
-			/>
+			<PhasePreview title="Room" phase="room" deck={FIXTURE_DECK} />
 			<section>
 				<PreviewTitle>Match overlay</PreviewTitle>
 				<MatchOverlay game={FIXTURE_DECK[0]} />

@@ -9,5 +9,3 @@ export const FIXTURE_DECK: GameCard[] = [
 	{ id: 105, name: "Ticket to Ride" },
 	{ id: 106, name: "Catan" },
 ];
-
-export const FIXTURE_PLAYERS = ["ann", "bob", "cara"];

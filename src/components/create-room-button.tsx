@@ -22,6 +22,7 @@ export function CreateRoomButton({ games }: { games: CollectionGame[] }) {
 							id: g.id,
 							name: g.name,
 							thumbnail: g.thumbnail,
+							image: g.image,
 						})),
 					},
 				}),

@@ -14,6 +14,7 @@ export type CollectionGame = {
 	id: number;
 	name: string;
 	thumbnail?: string;
+	image?: string;
 	minPlayers?: number;
 	maxPlayers?: number;
 	playtime?: number;
@@ -61,6 +62,7 @@ export const fetchCollection = createServerFn({ method: "POST" })
 				id: item.objectid,
 				name,
 				thumbnail: item.thumbnail,
+				image: item.image,
 				minPlayers: stats?.minplayers,
 				maxPlayers: stats?.maxplayers,
 				playtime: stats?.playingtime,
