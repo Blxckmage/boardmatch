@@ -38,7 +38,11 @@ function EntryChoices() {
 		e.preventDefault();
 		const trimmed = code.trim().toUpperCase();
 		if (!trimmed) return;
-		void navigate({ to: "/rooms/$code", params: { code: trimmed } });
+		void navigate({
+			to: "/rooms/$code",
+			params: { code: trimmed },
+			search: { name: undefined },
+		});
 	};
 
 	const create = () => {
