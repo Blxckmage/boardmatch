@@ -131,7 +131,7 @@ export function Field({
 	id,
 	...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
-	const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
+	const inputId = id ?? label.toLowerCase().replaceAll(/\s+/gu, "-");
 	return (
 		<div>
 			<label

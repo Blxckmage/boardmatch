@@ -6,7 +6,7 @@ import { getEnv } from "#/cf-env";
 export const Route = createFileRoute("/api/rooms/$code")({
 	server: {
 		handlers: {
-			GET: async ({ request, params }) => {
+			GET: ({ request, params }) => {
 				if (request.headers.get("Upgrade") !== "websocket") {
 					return Response.json({
 						room: params.code,
