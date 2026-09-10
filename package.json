@@ -1,60 +1,64 @@
 {
-  "name": "boardmatch",
-  "private": true,
-  "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
-  "scripts": {
-    "dev": "vite dev --port 3000",
-    "generate-routes": "tsr generate",
-    "build": "vite build",
-    "preview": "vite preview",
-    "format": "biome format",
-    "lint": "biome lint",
-    "check": "biome check",
-    "deploy": "alchemy deploy"
-  },
-  "dependencies": {
-    "@fontsource/anton": "^5.3.0",
-    "@fontsource/newsreader": "^5.3.0",
-    "@fontsource/space-grotesk": "^5.3.0",
-    "@fontsource/space-mono": "^5.3.0",
-    "@t3-oss/env-core": "^0.13.10",
-    "@tailwindcss/vite": "^4.1.18",
-    "@tanstack/react-devtools": "latest",
-    "@tanstack/react-router": "latest",
-    "@tanstack/react-router-devtools": "latest",
-    "@tanstack/react-start": "^1.168.50",
-    "bgg-api-ts": "^1.0.0",
-    "effect": "4.0.0-rc.112",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwindcss": "^4.1.18",
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.4.5",
-    "@effect/platform-bun": "4.0.0-rc.112",
-    "@effect/platform-node": "4.0.0-rc.112",
-    "@tanstack/devtools-vite": "latest",
-    "@tanstack/intent": "^0.4.0",
-    "@tanstack/router-cli": "^1.132.0",
-    "@types/node": "^22.10.2",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "alchemy": "^2.0.0-beta.76",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.0",
-    "wrangler": "^4.70.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "lightningcss",
-      "sharp",
-      "workerd"
-    ]
-  }
+	"name": "boardmatch",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#/*": "./src/*"
+	},
+	"scripts": {
+		"dev": "vite dev --port 3000",
+		"generate-routes": "tsr generate",
+		"build": "vite build",
+		"preview": "vite preview",
+		"lint": "oxlint --deny-warnings",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"typecheck": "tsc --noEmit",
+		"check": "bun run lint && bun run format:check && bun run typecheck",
+		"plan": "alchemy plan",
+		"deploy": "alchemy deploy"
+	},
+	"dependencies": {
+		"@fontsource/anton": "^5.3.0",
+		"@fontsource/newsreader": "^5.3.0",
+		"@fontsource/space-grotesk": "^5.3.0",
+		"@fontsource/space-mono": "^5.3.0",
+		"@t3-oss/env-core": "^0.13.10",
+		"@tailwindcss/vite": "^4.1.18",
+		"@tanstack/react-devtools": "latest",
+		"@tanstack/react-router": "latest",
+		"@tanstack/react-router-devtools": "latest",
+		"@tanstack/react-start": "^1.168.50",
+		"bgg-api-ts": "^1.0.0",
+		"effect": "4.0.0-rc.112",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"tailwindcss": "^4.1.18",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@effect/platform-bun": "4.0.0-rc.112",
+		"@effect/platform-node": "4.0.0-rc.112",
+		"@tanstack/devtools-vite": "latest",
+		"@tanstack/intent": "^0.4.0",
+		"@tanstack/router-cli": "^1.132.0",
+		"@types/node": "^22.10.2",
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"@vitejs/plugin-react": "^6.0.1",
+		"alchemy": "^2.0.0-beta.76",
+		"oxlint": "^1.82.0",
+		"prettier": "^3.9.6",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.0",
+		"wrangler": "^4.70.0"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"lightningcss",
+			"sharp",
+			"workerd"
+		]
+	}
 }
