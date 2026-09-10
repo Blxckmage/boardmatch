@@ -1,0 +1,12 @@
+{
+	"$schema": "https://cdn.jsdelivr.net/gh/oxc-project/oxlint@latest/configuration_schema.json",
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"pedantic": "warn",
+		"perf": "warn",
+		"style": "off",
+		"nursery": "off",
+		"restriction": "off"
+	}
+}
