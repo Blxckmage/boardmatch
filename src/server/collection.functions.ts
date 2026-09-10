@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import * as Effect from "effect/Effect";
 import { z } from "zod";
 import { getEnv } from "#/cf-env";
-import { fetchUserCollection, makeClient } from "./bgg";
+import { decodeEntities, fetchUserCollection, makeClient } from "./bgg";
 
 const collectionQuery = z.object({
 	username: z.string().trim().min(1),
@@ -39,7 +39,8 @@ export const fetchCollection = createServerFn({ method: "POST" })
 		for (const item of items) {
 			const rawName = item.name[0] as
 				{ value?: string; "#text"?: string } | undefined;
-			const name = rawName?.value ?? rawName?.["#text"];
+			const raw = rawName?.value ?? rawName?.["#text"];
+			const name = raw ? decodeEntities(raw) : undefined;
 			if (!name) continue;
 			const stats = item.stats;
 			if (

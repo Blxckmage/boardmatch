@@ -162,7 +162,7 @@ function JoinForm({
 				onChange={(e) => onName(e.target.value)}
 			/>
 			<div className="mt-6">
-				<Button variant="primary" disabled={busy || !name.trim()}>
+				<Button type="submit" variant="primary" disabled={busy || !name.trim()}>
 					{busy ? "Joining…" : "Join room"}
 				</Button>
 			</div>
