@@ -89,9 +89,6 @@ function RoomPage() {
 
 	return (
 		<div className="py-12 md:py-16">
-			<p className="font-mono text-xs uppercase tracking-[1.8px] text-mint">
-				Room {code}
-			</p>
 			<PhaseView
 				phase={phase}
 				problem={problem}
