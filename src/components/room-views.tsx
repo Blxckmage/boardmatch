@@ -1,0 +1,160 @@
+import { useMemo } from "react";
+
+import { Button, Field, PillTag } from "#/components/ui";
+import type { GameCard, RoomPlayer } from "#/server/room-protocol";
+
+export function Lobby({
+	players,
+	host,
+	you,
+	onStart,
+}: {
+	players: RoomPlayer[];
+	host: string | null;
+	you: string | null;
+	onStart: () => void;
+}) {
+	const ordered = [
+		...players.filter((p) => p.id === host),
+		...players.filter((p) => p.id !== host),
+	];
+	const isHost = host !== null && host === you;
+	const ready = players.length >= 2;
+
+	return (
+		<div className="mx-auto mt-8 w-full max-w-sm">
+			<ul className="space-y-2">
+				{ordered.map((p) => (
+					<LobbyRow key={p.id} player={p} isHost={p.id === host} />
+				))}
+			</ul>
+			{isHost ? (
+				<div className="mt-6">
+					<Button variant="primary" disabled={!ready} onClick={onStart}>
+						Start
+					</Button>
+					{!ready && (
+						<p className="font-mono mt-4 text-[11px] uppercase tracking-[1.1px] text-fog">
+							Need at least 2 players
+						</p>
+					)}
+				</div>
+			) : (
+				<p className="font-mono mt-6 text-[11px] uppercase tracking-[1.1px] text-fog">
+					Waiting for the host to start…
+				</p>
+			)}
+		</div>
+	);
+}
+
+function LobbyRow({ player, isHost }: { player: RoomPlayer; isHost: boolean }) {
+	return (
+		<li className="rounded-tile flex items-center gap-3 border border-white bg-canvas px-5 py-3">
+			<span className="font-sans text-lg font-bold text-white">
+				{player.name}
+			</span>
+			{isHost ? <PillTag tone="mint">Host</PillTag> : null}
+		</li>
+	);
+}
+
+export function JoinForm({
+	name,
+	busy,
+	onName,
+	onJoin,
+}: {
+	name: string;
+	busy: boolean;
+	onName: (v: string) => void;
+	onJoin: () => void;
+}) {
+	return (
+		<form
+			className="mt-6 max-w-sm"
+			onSubmit={(e) => {
+				e.preventDefault();
+				onJoin();
+			}}
+		>
+			<Field
+				label="Display name"
+				placeholder="e.g. Faza"
+				value={name}
+				onChange={(e) => onName(e.target.value)}
+			/>
+			<div className="mt-6">
+				<Button type="submit" variant="primary" disabled={busy || !name.trim()}>
+					{busy ? "Joining…" : "Join room"}
+				</Button>
+			</div>
+		</form>
+	);
+}
+
+const CONFETTI_TONES = ["#3cffd0", "#5200ff", "#ffffff"];
+
+function Confetti() {
+	const pieces = useMemo(
+		() =>
+			Array.from({ length: 28 }, (_, i) => ({
+				left: (i * 37) % 100,
+				delay: (i % 7) * 0.35,
+				duration: 2.4 + (i % 5) * 0.4,
+				tone: CONFETTI_TONES[i % CONFETTI_TONES.length],
+			})),
+		[],
+	);
+	return (
+		<>
+			<style>{`@keyframes bm-fall{to{transform:translateY(110vh) rotate(540deg)}}`}</style>
+			{pieces.map((p, i) => (
+				<span
+					// NOTE: decorative only, stable order
+					key={i}
+					className="absolute top-[-5vh] h-3 w-2"
+					style={{
+						left: `${p.left}%`,
+						background: p.tone,
+						animation: `bm-fall ${p.duration}s linear ${p.delay}s infinite`,
+					}}
+				/>
+			))}
+		</>
+	);
+}
+
+export function MatchOverlay({ game }: { game: GameCard }) {
+	return (
+		<div className="fixed inset-0 z-50 overflow-hidden bg-black/80">
+			<Confetti />
+			<div className="relative mx-auto mt-24 max-w-md rounded-tile border border-transparent bg-mint p-8 text-center md:p-10">
+				<p className="font-mono text-xs uppercase tracking-[1.8px] text-black">
+					Match found
+				</p>
+				{(game.image ?? game.thumbnail) ? (
+					<img
+						src={(game.image ?? game.thumbnail) as string}
+						alt=""
+						className="mx-auto mt-6 h-40 rounded-[4px] border border-black/20 object-cover"
+					/>
+				) : null}
+				<h2 className="mt-6 font-sans text-2xl font-bold leading-none text-black">
+					Tonight you&apos;re playing: {game.name}
+				</h2>
+				<p className="font-mono mt-6 text-[11px] uppercase tracking-[1.1px] text-black/70">
+					Powered by{" "}
+					<a
+						href="https://boardgamegeek.com"
+						target="_blank"
+						rel="noreferrer"
+						className="underline"
+					>
+						BoardGameGeek
+					</a>
+				</p>
+			</div>
+		</div>
+	);
+}
