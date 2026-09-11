@@ -3,8 +3,13 @@
 1. `.docs/` is source of truth: on EVERY task, `Read` `.docs/` dir first, then read every file in it before touching code.
 2. fff MCP ONLY for search: `fff_grep` = file contents (bare identifiers only, one per query), `fff_find_files` = find files/modules, `fff_multi_grep` = 2+ identifiers at once (OR logic). NEVER `bash` for `grep/rg/find/cat/head/tail/sed/awk/echo`; NEVER `Glob`/`Grep` when an fff tool fits. After 2 greps, READ the top hit — no more grep variations.
 3. `Read` to read, `Edit` to edit, `Write` for new files only. No new docs/abstractions/deps unless asked. No code comments except `// NOTE:`.
-4. Linear is the todo list: `Boardmatch` project, team `BLA` — pull its Backlog before starting, work bottom-up (Urgent foundation first), one branch per issue named `dev/bla-<id>-<short-slug>`, auto-commit conventional (`type(scope): subject`, `Refs: BLA-<id>` trailer), smoke (`check` + `build` green) before every merge, set In Progress on start and Done + comment on finish. Stack lives in `.docs/ARCHITECTURE.md`, never mirrored here.
+4. Linear is the todo list: `Boardmatch` project, team `BLA` — pull its Backlog before starting, work bottom-up (Urgent foundation first), one branch per issue named `dev/bla-<id>-<short-slug>`, auto-commit conventional (`type(scope): subject`, `Refs: BLA-<id>` trailer), smoke (`check` + `build` green) before every merge, set In Progress on start and Done + comment on finish. Test gates: `bun test` green always; any issue touching `src/server/room*.ts` or the protocol must extend `scripts/lobby-proof.ts` and show `bun run test:e2e` PASS before merge. Stack lives in `.docs/ARCHITECTURE.md`, never mirrored here.
 5. Effect: `Effect.gen` body = happy path only, `.pipe()` = all error handling; typed errors, `Schedule` retries, no raw try/catch in server code. Method: `.docs/DESIGN-SYSTEM/DESIGN_THINKING.md`.
+6. Prompting contract — tasks arrive in any shape; execute them thus:
+   Task slots: artifact + scope + verb + gate (e.g. "Join stuck, no error [artifact], `/rooms/$code` on preview [scope], diagnose, no code [verb], stop at the confirmed hop [gate]"). Missing slot = assume the cheapest reading, state it in one line, proceed.
+   Few-shot over abstract: two past examples of the wanted pattern beat a paragraph of adjectives; ask for them when taste matters.
+   Evidence before synthesis: one probe per hypothesis, stop at the first confirmed cause; never ship a fix for an unconfirmed cause.
+   Corrections graduate: any correction given twice becomes a standing rule here (or a HANDOVER gotcha) — propose the exact line when it happens.
 
 ## Call graph answers
 
