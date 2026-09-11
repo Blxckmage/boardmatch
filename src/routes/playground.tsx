@@ -15,6 +15,7 @@ import {
 	type SimRoom,
 	type SimUser,
 } from "#/components/fake-room";
+import { PlaySidebar } from "#/components/play-sidebar";
 import { Lobby, MatchOverlay } from "#/components/room-views";
 import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 
@@ -73,21 +74,28 @@ function Playground() {
 	const [name, setName] = useState("");
 
 	return (
-		<div className="py-8">
-			<p className="font-mono bg-uv px-4 py-2 text-center text-xs uppercase tracking-[1.8px] text-white">
-				Fake backend — playground only
-			</p>
-			{sim.room && (
-				<RoomSim room={sim.room} name={name} onName={setName} sim={sim} />
-			)}
-			{!sim.room && (
-				<AccessBox
-					name={name}
-					onName={setName}
-					action="Create room"
-					onGo={() => sim.create(name)}
-				/>
-			)}
+		<div className="flex min-h-dvh">
+			<PlaySidebar
+				room={sim.room}
+				name={name}
+				onName={setName}
+				onJoin={() => sim.join(name)}
+				onAddFake={sim.addFake}
+				onReset={sim.reset}
+				onKick={sim.kick}
+			/>
+			<div className="min-w-0 flex-1 px-6 py-8">
+				{sim.room ? (
+					<RoomSim room={sim.room} sim={sim} />
+				) : (
+					<AccessBox
+						name={name}
+						onName={setName}
+						action="Create room"
+						onGo={() => sim.create(name)}
+					/>
+				)}
+			</div>
 		</div>
 	);
 }
@@ -128,13 +136,9 @@ function AccessBox({
 
 function RoomSim({
 	room,
-	name,
-	onName,
 	sim,
 }: {
 	room: SimRoom;
-	name: string;
-	onName: (v: string) => void;
 	sim: ReturnType<typeof useSimRoom>;
 }) {
 	const hostId = room.users.find((u) => u.host && !u.kicked)?.id ?? null;
@@ -142,7 +146,11 @@ function RoomSim({
 
 	return (
 		<div className="mx-auto w-full max-w-3xl">
-			<RoomHeader room={room} />
+			{room.notice ? (
+				<p className="font-mono mt-4 text-xs uppercase tracking-[1.5px] text-white">
+					{room.notice}
+				</p>
+			) : null}
 			<Lobby
 				players={active.map(({ id, name: n }) => ({ id, name: n }))}
 				host={hostId}
@@ -160,71 +168,7 @@ function RoomSim({
 					/>
 				))}
 			</div>
-			<SimControls
-				name={name}
-				onName={onName}
-				onJoin={() => sim.join(name)}
-				onAddFake={sim.addFake}
-				onReset={sim.reset}
-			/>
 			<SimOutcome room={room} />
-		</div>
-	);
-}
-
-function RoomHeader({ room }: { room: SimRoom }) {
-	return (
-		<>
-			<div className="mt-6 flex items-center gap-3">
-				<PillTag tone="mint">Room {room.code}</PillTag>
-				{room.started ? <PillTag tone="slate">Started</PillTag> : null}
-			</div>
-			{room.notice ? (
-				<p className="font-mono mt-4 text-xs uppercase tracking-[1.5px] text-white">
-					{room.notice}
-				</p>
-			) : null}
-		</>
-	);
-}
-
-function SimControls({
-	name,
-	onName,
-	onJoin,
-	onAddFake,
-	onReset,
-}: {
-	name: string;
-	onName: (v: string) => void;
-	onJoin: () => void;
-	onAddFake: () => void;
-	onReset: () => void;
-}) {
-	return (
-		<div className="rounded-tile mt-8 border border-white bg-canvas p-6">
-			<p className="font-mono text-xs uppercase tracking-[1.8px] text-fog">
-				Chaos controls
-			</p>
-			<div className="mt-4 flex flex-wrap items-end gap-3">
-				<div className="max-w-[200px] flex-1">
-					<Field
-						label="Join as"
-						placeholder="e.g. dave"
-						value={name}
-						onChange={(e) => onName(e.target.value)}
-					/>
-				</div>
-				<Button variant="secondary" disabled={!name.trim()} onClick={onJoin}>
-					Join room
-				</Button>
-				<Button variant="secondary" onClick={onAddFake}>
-					Add fake player
-				</Button>
-				<Button variant="tertiary" onClick={onReset}>
-					Reset room
-				</Button>
-			</div>
 		</div>
 	);
 }
@@ -254,7 +198,7 @@ function UserPane({
 	onKick: () => void;
 }) {
 	return (
-		<section className="rounded-tile border border-white/20 bg-canvas p-4">
+		<section className="border border-white/20 bg-canvas p-4">
 			<div className="flex items-center gap-3">
 				<span className="font-sans text-lg font-bold text-white">
 					{user.name}
