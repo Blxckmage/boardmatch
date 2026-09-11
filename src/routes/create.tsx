@@ -54,7 +54,7 @@ function CreatePage() {
 	);
 }
 
-function FetchForm({
+export function FetchForm({
 	busy,
 	fields,
 	setters,

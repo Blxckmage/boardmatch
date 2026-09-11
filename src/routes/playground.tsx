@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Button, Field, PillTag } from "#/components/ui";
 import { FIXTURE_DECK } from "#/components/dev-fixtures";
+import { useCollectionFetch } from "#/components/create-flow";
 import {
 	addFakeUser,
 	applySwipe,
@@ -16,6 +17,8 @@ import {
 	type SimUser,
 } from "#/components/fake-room";
 import { PlaySidebar } from "#/components/play-sidebar";
+import { FetchForm } from "#/routes/create";
+import type { GameCard } from "#/server/room-protocol";
 import { Lobby, MatchOverlay } from "#/components/room-views";
 import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 
@@ -36,8 +39,8 @@ function useSimRoom() {
 				if (!prev?.started) return prev;
 				let next = prev;
 				for (const u of prev.users) {
-					if (u.fake && !u.kicked && u.swiped < FIXTURE_DECK.length) {
-						next = applySwipe(next, u.id, FIXTURE_DECK[u.swiped].id, "right");
+					if (u.fake && !u.kicked && u.swiped < prev.deck.length) {
+						next = applySwipe(next, u.id, prev.deck[u.swiped].id, "right");
 					}
 				}
 				return next;
@@ -48,14 +51,15 @@ function useSimRoom() {
 
 	useEffect(() => {
 		if (!room || !room.started || room.match || room.noMatch) return;
-		if (!roomDone(room, FIXTURE_DECK)) return;
-		const game = evaluateRoom(room, FIXTURE_DECK);
+		if (!roomDone(room, room.deck)) return;
+		const game = evaluateRoom(room, room.deck);
 		setRoom((prev) => (prev ? { ...prev, match: game, noMatch: !game } : prev));
 	}, [room]);
 
-	const create = (name: string) => setRoom(createRoomState(name));
-	const join = (name: string) =>
-		setRoom((prev) => (prev ? joinUser(prev, name) : prev));
+	const create = (name: string, deck: GameCard[]) =>
+		setRoom(createRoomState(name, deck));
+	const join = (name: string, code: string) =>
+		setRoom((prev) => (prev ? joinUser(prev, name, code) : prev));
 	const start = () => setRoom((prev) => (prev ? startRoom(prev) : prev));
 	const swipe = (userId: string, gameId: number, direction: Direction) =>
 		setRoom((prev) =>
@@ -72,6 +76,7 @@ function useSimRoom() {
 function Playground() {
 	const sim = useSimRoom();
 	const [name, setName] = useState("");
+	const [code, setCode] = useState("");
 
 	return (
 		<div className="flex min-h-dvh">
@@ -79,7 +84,9 @@ function Playground() {
 				room={sim.room}
 				name={name}
 				onName={setName}
-				onJoin={() => sim.join(name)}
+				code={code}
+				onCode={setCode}
+				onJoin={() => sim.join(name, code)}
 				onAddFake={sim.addFake}
 				onReset={sim.reset}
 				onKick={sim.kick}
@@ -88,11 +95,10 @@ function Playground() {
 				{sim.room ? (
 					<RoomSim room={sim.room} sim={sim} />
 				) : (
-					<AccessBox
+					<SetupBox
 						name={name}
 						onName={setName}
-						action="Create room"
-						onGo={() => sim.create(name)}
+						onCreate={(deck) => sim.create(name, deck)}
 					/>
 				)}
 			</div>
@@ -100,37 +106,75 @@ function Playground() {
 	);
 }
 
-function AccessBox({
+function SetupBox({
 	name,
 	onName,
-	action,
-	onGo,
+	onCreate,
 }: {
 	name: string;
 	onName: (v: string) => void;
-	action: string;
-	onGo: () => void;
+	onCreate: (deck: GameCard[]) => void;
+}) {
+	const col = useCollectionFetch();
+	const deck = col.games.length > 0 ? col.games : FIXTURE_DECK;
+
+	return (
+		<div className="mx-auto mt-8 w-full max-w-2xl">
+			<FetchForm
+				busy={col.busy}
+				fields={col.fields}
+				setters={col.setters}
+				onFetch={col.fetch}
+			/>
+			<DeckStatus
+				count={col.games.length}
+				total={col.total}
+				error={col.error}
+			/>
+			<div className="mt-6 max-w-sm">
+				<Field
+					label="Display name"
+					placeholder="e.g. ann"
+					value={name}
+					onChange={(e) => onName(e.target.value)}
+				/>
+				<div className="mt-6">
+					<Button
+						type="button"
+						variant="primary"
+						disabled={!name.trim()}
+						onClick={() => onCreate(deck)}
+					>
+						Create room
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function DeckStatus({
+	count,
+	total,
+	error,
+}: {
+	count: number;
+	total: number | null;
+	error: string | null;
 }) {
 	return (
-		<form
-			className="mx-auto mt-8 w-full max-w-sm"
-			onSubmit={(e) => {
-				e.preventDefault();
-				onGo();
-			}}
-		>
-			<Field
-				label="Display name"
-				placeholder="e.g. ann"
-				value={name}
-				onChange={(e) => onName(e.target.value)}
-			/>
-			<div className="mt-6">
-				<Button type="submit" variant="primary" disabled={!name.trim()}>
-					{action}
-				</Button>
-			</div>
-		</form>
+		<>
+			{error ? (
+				<p className="font-mono mt-6 text-xs uppercase tracking-[1.5px] text-white">
+					{error}
+				</p>
+			) : null}
+			<p className="font-mono mt-6 text-xs uppercase tracking-[1.8px] text-fog">
+				{count > 0
+					? `${count} of ${total} games — real deck`
+					: `fixture deck (${FIXTURE_DECK.length})`}
+			</p>
+		</>
 	);
 }
 
@@ -162,6 +206,7 @@ function RoomSim({
 					<UserPane
 						key={u.id}
 						user={u}
+						deck={room.deck}
 						started={room.started}
 						onSwipe={(gameId, direction) => sim.swipe(u.id, gameId, direction)}
 						onKick={() => sim.kick(u.id)}
@@ -188,11 +233,13 @@ function SimOutcome({ room }: { room: SimRoom }) {
 
 function UserPane({
 	user,
+	deck,
 	started,
 	onSwipe,
 	onKick,
 }: {
 	user: SimUser;
+	deck: GameCard[];
 	started: boolean;
 	onSwipe: (gameId: number, direction: Direction) => void;
 	onKick: () => void;
@@ -214,7 +261,7 @@ function UserPane({
 				</button>
 			</div>
 			{started ? (
-				<SwipeDeck key={user.id} deck={FIXTURE_DECK} onSwipe={onSwipe} />
+				<SwipeDeck key={user.id} deck={deck} onSwipe={onSwipe} />
 			) : (
 				<p className="font-mono mt-4 text-[11px] uppercase tracking-[1.1px] text-fog">
 					Waiting for start…

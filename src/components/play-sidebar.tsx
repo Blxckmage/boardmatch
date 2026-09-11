@@ -1,11 +1,12 @@
 import { Button, Field } from "#/components/ui";
-import { FIXTURE_DECK } from "#/components/dev-fixtures";
 import type { SimRoom } from "#/components/fake-room";
 
 export function PlaySidebar({
 	room,
 	name,
 	onName,
+	code,
+	onCode,
 	onJoin,
 	onAddFake,
 	onReset,
@@ -14,6 +15,8 @@ export function PlaySidebar({
 	room: SimRoom | null;
 	name: string;
 	onName: (v: string) => void;
+	code: string;
+	onCode: (v: string) => void;
 	onJoin: () => void;
 	onAddFake: () => void;
 	onReset: () => void;
@@ -33,6 +36,8 @@ export function PlaySidebar({
 				roomExists={room !== null}
 				name={name}
 				onName={onName}
+				code={code}
+				onCode={onCode}
 				onJoin={onJoin}
 				onAddFake={onAddFake}
 				onReset={onReset}
@@ -69,6 +74,8 @@ function SidebarControls({
 	roomExists,
 	name,
 	onName,
+	code,
+	onCode,
 	onJoin,
 	onAddFake,
 	onReset,
@@ -76,6 +83,8 @@ function SidebarControls({
 	roomExists: boolean;
 	name: string;
 	onName: (v: string) => void;
+	code: string;
+	onCode: (v: string) => void;
 	onJoin: () => void;
 	onAddFake: () => void;
 	onReset: () => void;
@@ -85,14 +94,13 @@ function SidebarControls({
 			<p className="font-mono text-[11px] uppercase tracking-[1.1px] text-fog">
 				Controls
 			</p>
-			<div className="mt-3">
-				<Field
-					label="Join as"
-					placeholder="e.g. dave"
-					value={name}
-					onChange={(e) => onName(e.target.value)}
-				/>
-			</div>
+			<JoinFields
+				name={name}
+				onName={onName}
+				code={code}
+				onCode={onCode}
+				showCode={roomExists}
+			/>
 			<div className="mt-3 flex flex-wrap gap-2">
 				{roomExists ? (
 					<Button variant="secondary" disabled={!name.trim()} onClick={onJoin}>
@@ -107,6 +115,43 @@ function SidebarControls({
 				</Button>
 			</div>
 		</div>
+	);
+}
+
+function JoinFields({
+	name,
+	onName,
+	code,
+	onCode,
+	showCode,
+}: {
+	name: string;
+	onName: (v: string) => void;
+	code: string;
+	onCode: (v: string) => void;
+	showCode: boolean;
+}) {
+	return (
+		<>
+			<div className="mt-3">
+				<Field
+					label="Join as"
+					placeholder="e.g. dave"
+					value={name}
+					onChange={(e) => onName(e.target.value)}
+				/>
+			</div>
+			{showCode ? (
+				<div className="mt-3">
+					<Field
+						label="Room code"
+						placeholder="e.g. KX7Q2M"
+						value={code}
+						onChange={(e) => onCode(e.target.value)}
+					/>
+				</div>
+			) : null}
+		</>
 	);
 }
 
@@ -139,7 +184,7 @@ function RosterTable({
 						{u.fake && !u.kicked ? <span className="text-fog">[F]</span> : null}
 						{u.kicked ? <span className="text-fog">[X]</span> : null}
 						<span className="ml-auto text-fog">
-							{u.swiped}/{FIXTURE_DECK.length}·{u.likes.length}♥
+							{u.swiped}/{room.deck.length}·{u.likes.length}♥
 						</span>
 						{u.kicked ? null : (
 							<button

@@ -13,6 +13,7 @@ export type SimUser = {
 
 export type SimRoom = {
 	code: string;
+	deck: GameCard[];
 	started: boolean;
 	match: GameCard | null;
 	noMatch: boolean;
@@ -20,12 +21,16 @@ export type SimRoom = {
 	users: SimUser[];
 };
 
-export const createRoomState = (hostName: string): SimRoom | null => {
+export const createRoomState = (
+	hostName: string,
+	deck: GameCard[],
+): SimRoom | null => {
 	const name = hostName.trim();
 	if (!name) return null;
 	const id = `you-${Date.now()}`;
 	return {
 		code: makeRoomCode(),
+		deck,
 		started: false,
 		match: null,
 		noMatch: false,
@@ -44,9 +49,16 @@ export const createRoomState = (hostName: string): SimRoom | null => {
 	};
 };
 
-export const joinUser = (room: SimRoom, display: string): SimRoom | null => {
+export const joinUser = (
+	room: SimRoom,
+	display: string,
+	code: string,
+): SimRoom | null => {
 	const name = display.trim();
 	if (!name) return null;
+	if (code.trim().toUpperCase() !== room.code) {
+		return { ...room, notice: "room not found — check the code" };
+	}
 	if (room.started) {
 		return { ...room, notice: "game already started — late join refused" };
 	}
