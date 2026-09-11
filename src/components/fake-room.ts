@@ -1,135 +1,158 @@
-import { useEffect, useRef, useState } from "react";
+import { checkMatch, makeRoomCode } from "#/server/room-protocol";
+import type { GameCard } from "#/server/room-protocol";
 
-import { checkMatch } from "#/server/room-protocol";
-import type { GameCard, RoomPlayer } from "#/server/room-protocol";
-import { FIXTURE_DECK } from "#/components/dev-fixtures";
+export type SimUser = {
+	id: string;
+	name: string;
+	host: boolean;
+	fake: boolean;
+	likes: number[];
+	swiped: number;
+	kicked: boolean;
+};
 
-function useLater() {
-	const timers = useRef<number[]>([]);
+export type SimRoom = {
+	code: string;
+	started: boolean;
+	match: GameCard | null;
+	noMatch: boolean;
+	notice: string | null;
+	users: SimUser[];
+};
 
-	useEffect(
-		() => () => {
-			for (const t of timers.current) clearTimeout(t);
-		},
-		[],
-	);
-
-	const later = (ms: number, fn: () => void) => {
-		timers.current.push(window.setTimeout(fn, ms));
-	};
-	const clear = () => {
-		for (const t of timers.current) clearTimeout(t);
-		timers.current = [];
-	};
-	return { later, clear };
-}
-
-type PlayerSetter = (update: (prev: RoomPlayer[]) => RoomPlayer[]) => void;
-
-function rosterOps(
-	host: string | null,
-	setPlayers: PlayerSetter,
-	setHost: (host: string | null) => void,
-) {
-	const arrive = (p: RoomPlayer) => {
-		setPlayers((prev) =>
-			prev.some((q) => q.id === p.id) ? prev : [...prev, p],
-		);
-	};
-
-	const dropPlayer = (id: string, players: RoomPlayer[]) => {
-		const next = players.filter((p) => p.id !== id);
-		setPlayers(() => next);
-		if (host === id) setHost(next[0]?.id ?? null);
-	};
-
-	const addLateJoiner = () => {
-		const id = `dave-${Date.now()}`;
-		setPlayers((prev) => [...prev, { id, name: "dave (late)" }]);
-	};
-
-	return { arrive, dropPlayer, addLateJoiner };
-}
-
-export function useFakeRoster() {
-	const [players, setPlayers] = useState<RoomPlayer[]>([]);
-	const [host, setHost] = useState<string | null>(null);
-	const [you, setYou] = useState<string | null>(null);
-	const { later, clear } = useLater();
-	const ops = rosterOps(host, setPlayers, setHost);
-
-	const joinAs = (display: string, asHost: boolean): string | null => {
-		const trimmed = display.trim();
-		if (!trimmed) return null;
-		const id = `you-${Date.now()}`;
-		setYou(id);
-		if (asHost) {
-			setHost(id);
-			setPlayers([{ id, name: trimmed }]);
-			later(2000, () => ops.arrive({ id: "bob", name: "bob" }));
-			later(5000, () => ops.arrive({ id: "cara", name: "cara" }));
-		} else {
-			setHost("ann");
-			setPlayers([
-				{ id: "ann", name: "ann" },
-				{ id: "bob", name: "bob" },
-				{ id, name: trimmed },
-			]);
-		}
-		return id;
-	};
-
-	const dropPlayer = (id: string) => {
-		ops.dropPlayer(id, players);
-	};
-
-	const resetRoster = () => {
-		clear();
-		setPlayers([]);
-		setHost(null);
-		setYou(null);
-	};
-
+export const createRoomState = (hostName: string): SimRoom | null => {
+	const name = hostName.trim();
+	if (!name) return null;
+	const id = `you-${Date.now()}`;
 	return {
-		players,
-		host,
-		you,
-		joinAs,
-		dropPlayer,
-		addLateJoiner: ops.addLateJoiner,
-		resetRoster,
+		code: makeRoomCode(),
+		started: false,
+		match: null,
+		noMatch: false,
+		notice: null,
+		users: [
+			{
+				id,
+				name,
+				host: true,
+				fake: false,
+				likes: [],
+				swiped: 0,
+				kicked: false,
+			},
+		],
 	};
-}
+};
 
-export function useFakeMatch(players: RoomPlayer[], you: string | null) {
-	const [match, setMatch] = useState<GameCard | null>(null);
-	const likes = useRef(new Map<number, Set<string>>());
-
-	const recordLike = (gameId: number) => {
-		if (!you) return;
-		const set = likes.current.get(gameId) ?? new Set<string>();
-		set.add(you);
-		likes.current.set(gameId, set);
-		const voters = players.map((p) => p.id);
-		const likedBy = [...set].filter((id) => voters.includes(id));
-		const found = checkMatch(FIXTURE_DECK, gameId, likedBy, voters);
-		if (found) setMatch(found);
+export const joinUser = (room: SimRoom, display: string): SimRoom | null => {
+	const name = display.trim();
+	if (!name) return null;
+	if (room.started) {
+		return { ...room, notice: "game already started — late join refused" };
+	}
+	const id = `you-${Date.now()}`;
+	return {
+		...room,
+		notice: null,
+		users: [
+			...room.users,
+			{
+				id,
+				name,
+				host: false,
+				fake: false,
+				likes: [],
+				swiped: 0,
+				kicked: false,
+			},
+		],
 	};
+};
 
-	const forceMatch = () => {
-		for (const game of FIXTURE_DECK) {
-			const set = likes.current.get(game.id) ?? new Set<string>();
-			for (const p of players) {
-				if (p.id !== you) set.add(p.id);
-			}
-			likes.current.set(game.id, set);
-		}
+export const startRoom = (room: SimRoom): SimRoom => ({
+	...room,
+	started: true,
+});
+
+export const applySwipe = (
+	room: SimRoom,
+	userId: string,
+	gameId: number,
+	direction: "left" | "right",
+): SimRoom => ({
+	...room,
+	users: room.users.map((u) =>
+		u.id !== userId || u.kicked
+			? u
+			: Object.assign({}, u, {
+					swiped: u.swiped + 1,
+					likes: direction === "right" ? [...u.likes, gameId] : u.likes,
+				}),
+	),
+});
+
+export const kickUser = (room: SimRoom, id: string): SimRoom => {
+	const users = room.users.map((u) =>
+		u.id === id ? Object.assign({}, u, { kicked: true }) : u,
+	);
+	const active = users.filter((u) => !u.kicked);
+	const hostGone = !active.some((u) => u.host);
+	return {
+		...room,
+		users: users.map((u, _, arr) =>
+			hostGone
+				? Object.assign({}, u, {
+						host: u.id === arr.find((v) => !v.kicked)?.id,
+					})
+				: u,
+		),
 	};
+};
 
-	const resetMatch = () => {
-		likes.current.clear();
-		setMatch(null);
+export const addFakeUser = (room: SimRoom): SimRoom => {
+	const n = room.users.filter((u) => u.fake).length + 1;
+	const id = `fake-${Date.now()}`;
+	return {
+		...room,
+		users: [
+			...room.users,
+			{
+				id,
+				name: `bot-${n}`,
+				host: false,
+				fake: true,
+				likes: [],
+				swiped: 0,
+				kicked: false,
+			},
+		],
 	};
+};
 
-	return { match, recordLike, forceMatch, resetMatch };
-}
+// NOTE: null = still swiping; a game = unanimous agreement in deck order.
+export const evaluateRoom = (
+	room: SimRoom,
+	deck: GameCard[],
+): GameCard | null => {
+	const active = room.users.filter((u) => !u.kicked);
+	if (!room.started || active.length === 0) return null;
+	if (active.some((u) => u.swiped < deck.length)) return null;
+	const voters = active.map((u) => u.id);
+	for (const game of deck) {
+		const likedBy = active
+			.filter((u) => u.likes.includes(game.id))
+			.map((u) => u.id);
+		const found = checkMatch(deck, game.id, likedBy, voters);
+		if (found) return found;
+	}
+	return null;
+};
+
+export const roomDone = (room: SimRoom, deck: GameCard[]): boolean => {
+	const active = room.users.filter((u) => !u.kicked);
+	return (
+		room.started &&
+		active.length > 0 &&
+		active.every((u) => u.swiped >= deck.length)
+	);
+};
