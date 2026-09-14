@@ -1,4 +1,4 @@
-import { Lobby, MatchOverlay } from "#/components/room-views";
+import { Lobby, MatchOverlay, RoomHeader } from "#/components/room-views";
 import { SwipeDeck } from "#/components/swipe-deck";
 import type { Direction } from "#/components/swipe-deck";
 import { PillTag } from "#/components/ui";
@@ -25,6 +25,7 @@ export function RoomSim({ room, sim }: { room: SimRoom; sim: PlaySim }) {
 					{room.notice}
 				</p>
 			) : null}
+			<RoomHeader code={room.code} />
 			<Lobby
 				players={active.map(({ id, name: n }) => ({ id, name: n }))}
 				host={hostId}

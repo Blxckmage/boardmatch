@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Button, Field, PillTag } from "#/components/ui";
 import { SwipeDeck } from "#/components/swipe-deck";
@@ -60,6 +60,33 @@ function LobbyRow({ player, isHost }: { player: RoomPlayer; isHost: boolean }) {
 	);
 }
 
+export function RoomHeader({ code }: { code: string }) {
+	const [copied, setCopied] = useState(false);
+	const copy = () => {
+		try {
+			void navigator.clipboard
+				.writeText(window.location.href)
+				.then(() => setCopied(true));
+		} catch {
+			setCopied(false);
+		}
+	};
+	return (
+		<div className="mx-auto flex w-full max-w-sm items-center gap-3">
+			<p className="font-mono text-xs uppercase tracking-[1.8px] text-mint">
+				Room {code}
+			</p>
+			<button
+				type="button"
+				onClick={copy}
+				className="font-mono ml-auto cursor-pointer text-[11px] uppercase tracking-[1.1px] text-fog"
+			>
+				{copied ? "Copied" : "Copy invite"}
+			</button>
+		</div>
+	);
+}
+
 export function JoinForm({
 	name,
 	busy,
@@ -71,11 +98,17 @@ export function JoinForm({
 	onName: (v: string) => void;
 	onJoin: () => void;
 }) {
+	const [tried, setTried] = useState(false);
+	const blank = !name.trim();
 	return (
 		<form
 			className="mt-6 max-w-sm"
 			onSubmit={(e) => {
 				e.preventDefault();
+				if (blank) {
+					setTried(true);
+					return;
+				}
 				onJoin();
 			}}
 		>
@@ -83,10 +116,16 @@ export function JoinForm({
 				label="Display name"
 				placeholder="e.g. Faza"
 				value={name}
+				disabled={busy}
 				onChange={(e) => onName(e.target.value)}
 			/>
+			{tried && blank ? (
+				<p className="font-mono mt-4 text-[11px] uppercase tracking-[1.1px] text-white">
+					Enter a display name to join.
+				</p>
+			) : null}
 			<div className="mt-6">
-				<Button type="submit" variant="primary" disabled={busy || !name.trim()}>
+				<Button type="submit" variant="primary" disabled={busy || blank}>
 					{busy ? "Joining…" : "Join room"}
 				</Button>
 			</div>
@@ -162,9 +201,31 @@ export function MatchOverlay({ game }: { game: GameCard }) {
 
 export type Phase = "name" | "joining" | "lobby" | "deck" | "error";
 
+export function PhaseError({
+	problem,
+	onJoin,
+}: {
+	problem: string | null;
+	onJoin: () => void;
+}) {
+	return (
+		<div className="mx-auto mt-6 w-full max-w-sm">
+			<p className="font-mono text-xs uppercase tracking-[1.5px] text-white">
+				{problem}
+			</p>
+			<div className="mt-6">
+				<Button variant="secondary" onClick={onJoin}>
+					Rejoin
+				</Button>
+			</div>
+		</div>
+	);
+}
+
 export function PhaseView({
 	phase,
 	problem,
+	code,
 	name,
 	busy,
 	deck,
@@ -178,6 +239,7 @@ export function PhaseView({
 }: {
 	phase: Phase;
 	problem: string | null;
+	code: string;
 	name: string;
 	busy: boolean;
 	deck: GameCard[];
@@ -193,14 +255,20 @@ export function PhaseView({
 		return <JoinForm name={name} busy={busy} onName={onName} onJoin={onJoin} />;
 	}
 	if (phase === "error") {
-		return (
-			<p className="font-mono mt-6 text-xs uppercase tracking-[1.5px] text-white">
-				{problem}
-			</p>
-		);
+		return <PhaseError problem={problem} onJoin={onJoin} />;
 	}
 	if (phase === "lobby") {
-		return <Lobby players={players} host={host} you={you} onStart={onStart} />;
+		return (
+			<>
+				<RoomHeader code={code} />
+				<Lobby players={players} host={host} you={you} onStart={onStart} />
+			</>
+		);
 	}
-	return <SwipeDeck deck={deck} onSwipe={onSwipe} />;
+	return (
+		<>
+			<RoomHeader code={code} />
+			<SwipeDeck deck={deck} onSwipe={onSwipe} />
+		</>
+	);
 }
