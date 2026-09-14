@@ -1,4 +1,4 @@
-import { checkMatch, makeRoomCode } from "#/server/room-protocol";
+import { checkMatch, graceExpired, makeRoomCode } from "#/server/room-protocol";
 import type { GameCard } from "#/server/room-protocol";
 
 export type SimUser = {
@@ -9,6 +9,8 @@ export type SimUser = {
 	likes: number[];
 	swiped: number;
 	kicked: boolean;
+	away: boolean;
+	leftAt: number | null;
 };
 
 export type SimRoom = {
@@ -44,22 +46,44 @@ export const createRoomState = (
 				likes: [],
 				swiped: 0,
 				kicked: false,
+				away: false,
+				leftAt: null,
 			},
 		],
 	};
 };
 
+const reclaimSeat = (room: SimRoom, id: string): SimRoom => ({
+	...room,
+	notice: null,
+	users: room.users.map((u) =>
+		u.id === id ? Object.assign({}, u, { away: false, leftAt: null }) : u,
+	),
+});
+
 export const joinUser = (
 	room: SimRoom,
 	display: string,
 	code: string,
+	claimId?: string,
 ): SimRoom | null => {
 	const name = display.trim();
 	if (!name) return null;
 	if (code.trim().toUpperCase() !== room.code) {
 		return { ...room, notice: "room not found — check the code" };
 	}
+	const reclaim =
+		claimId === undefined
+			? undefined
+			: room.users.find((u) => u.id === claimId && u.away);
 	if (room.started) {
+		if (
+			reclaim?.leftAt !== null &&
+			reclaim?.leftAt !== undefined &&
+			!graceExpired(Date.now(), reclaim.leftAt)
+		) {
+			return reclaimSeat(room, reclaim.id);
+		}
 		return { ...room, notice: "game already started — late join refused" };
 	}
 	const id = `you-${Date.now()}`;
@@ -76,9 +100,36 @@ export const joinUser = (
 				likes: [],
 				swiped: 0,
 				kicked: false,
+				away: false,
+				leftAt: null,
 			},
 		],
 	};
+};
+
+// NOTE: drop keeps the seat (mirror of server grace) — the sim does not
+// promote on drop; the server does.
+export const dropUser = (room: SimRoom, id: string): SimRoom => ({
+	...room,
+	users: room.users.map((u) =>
+		u.id === id ? Object.assign({}, u, { away: true, leftAt: Date.now() }) : u,
+	),
+});
+
+export const rejoinUser = (room: SimRoom, id: string): SimRoom => ({
+	...room,
+	notice: null,
+	users: room.users.map((u) =>
+		u.id === id ? Object.assign({}, u, { away: false, leftAt: null }) : u,
+	),
+});
+
+// NOTE: away inside grace still counts (blocks the match like the
+// server); expired away seats are gone.
+const isPresent = (u: SimUser): boolean => {
+	if (u.kicked) return false;
+	if (!u.away || u.leftAt === null) return true;
+	return !graceExpired(Date.now(), u.leftAt);
 };
 
 export const startRoom = (room: SimRoom): SimRoom => ({
@@ -94,7 +145,7 @@ export const applySwipe = (
 ): SimRoom => ({
 	...room,
 	users: room.users.map((u) =>
-		u.id !== userId || u.kicked
+		u.id !== userId || u.kicked || u.away
 			? u
 			: Object.assign({}, u, {
 					swiped: u.swiped + 1,
@@ -136,6 +187,8 @@ export const addFakeUser = (room: SimRoom): SimRoom => {
 				likes: [],
 				swiped: 0,
 				kicked: false,
+				away: false,
+				leftAt: null,
 			},
 		],
 	};
@@ -146,7 +199,7 @@ export const evaluateRoom = (
 	room: SimRoom,
 	deck: GameCard[],
 ): GameCard | null => {
-	const active = room.users.filter((u) => !u.kicked);
+	const active = room.users.filter(isPresent);
 	if (!room.started || active.length === 0) return null;
 	if (active.some((u) => u.swiped < deck.length)) return null;
 	const voters = active.map((u) => u.id);
@@ -161,7 +214,7 @@ export const evaluateRoom = (
 };
 
 export const roomDone = (room: SimRoom, deck: GameCard[]): boolean => {
-	const active = room.users.filter((u) => !u.kicked);
+	const active = room.users.filter(isPresent);
 	return (
 		room.started &&
 		active.length > 0 &&

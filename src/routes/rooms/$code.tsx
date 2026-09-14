@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
-import { JoinForm, Lobby, MatchOverlay } from "#/components/room-views";
-import { SwipeDeck } from "#/components/swipe-deck";
+import { MatchOverlay, PhaseView } from "#/components/room-views";
 import type { Direction } from "#/components/swipe-deck";
+import type { Phase } from "#/components/room-views";
 import type {
 	ClientMsg,
 	GameCard,
@@ -18,8 +18,6 @@ export const Route = createFileRoute("/rooms/$code")({
 	component: RoomPage,
 });
 
-type Phase = "name" | "joining" | "lobby" | "deck" | "error";
-
 type JoinedInfo = {
 	you: string;
 	deck: GameCard[];
@@ -33,6 +31,8 @@ type RoomEvents = {
 	onPlayers: (players: RoomPlayer[], host: string | null) => void;
 	onStart: (deck: GameCard[]) => void;
 	onMatch: (game: GameCard) => void;
+	onRefused: () => void;
+	onClose: (code: number, reason: string) => void;
 	onError: () => void;
 };
 
@@ -41,10 +41,15 @@ const wsUrl = (code: string) => {
 	return `${proto}://${window.location.host}/api/rooms/${code}`;
 };
 
-const connectRoom = (code: string, name: string, events: RoomEvents) => {
+const connectRoom = (
+	code: string,
+	name: string,
+	claimId: string | undefined,
+	events: RoomEvents,
+) => {
 	const ws = new WebSocket(wsUrl(code));
 	ws.addEventListener("open", () => {
-		ws.send(JSON.stringify({ type: "join", name }));
+		ws.send(JSON.stringify({ type: "join", name, claimId }));
 	});
 	ws.addEventListener("message", (event) => {
 		const msg = JSON.parse(event.data as string) as ServerMsg;
@@ -59,6 +64,10 @@ const connectRoom = (code: string, name: string, events: RoomEvents) => {
 		else if (msg.type === "players") events.onPlayers(msg.players, msg.host);
 		else if (msg.type === "start") events.onStart(msg.deck);
 		else if (msg.type === "match") events.onMatch(msg.game);
+		else if (msg.type === "refused") events.onRefused();
+	});
+	ws.addEventListener("close", (event) => {
+		events.onClose(event.code, event.reason);
 	});
 	ws.addEventListener("error", events.onError);
 	return ws;
@@ -85,11 +94,14 @@ type LobbySetters = {
 	setDeck: (deck: GameCard[]) => void;
 	setMatch: (game: GameCard) => void;
 	setProblem: (problem: string | null) => void;
+	markSettled: () => void;
+	isSettled: () => boolean;
 };
 
 function joinEvents(s: LobbySetters): RoomEvents {
 	return {
 		onJoined: (info) => {
+			s.markSettled();
 			s.setYou(info.you);
 			s.setHost(info.host);
 			s.setPlayers(info.players);
@@ -110,6 +122,17 @@ function joinEvents(s: LobbySetters): RoomEvents {
 			s.setPhase("deck");
 		},
 		onMatch: s.setMatch,
+		onRefused: () => {
+			s.markSettled();
+			s.setProblem("Game already started — no late joins.");
+			s.setPhase("error");
+		},
+		onClose: (_code, reason) => {
+			if (s.isSettled()) return;
+			s.markSettled();
+			s.setProblem(reason || "Connection closed before joining.");
+			s.setPhase("error");
+		},
 		onError: () => {
 			s.setProblem("Connection failed — the room needs workerd.");
 			s.setPhase("error");
@@ -163,6 +186,29 @@ function useRoomChannel() {
 	return { socket, swipe, start };
 }
 
+type JoinSetters = Omit<LobbySetters, "markSettled" | "isSettled">;
+
+function openRoomSocket(
+	code: string,
+	name: string,
+	claimId: string | undefined,
+	s: JoinSetters,
+) {
+	let done = false;
+	return connectRoom(
+		code,
+		name,
+		claimId,
+		joinEvents({
+			...s,
+			markSettled: () => {
+				done = true;
+			},
+			isSettled: () => done,
+		}),
+	);
+}
+
 function useRoomConnection(code: string, autoName?: string) {
 	const [phase, setPhase] = useState<Phase>("name");
 	const [name, setName] = useState("");
@@ -177,19 +223,15 @@ function useRoomConnection(code: string, autoName?: string) {
 		if (!trimmed) return;
 		setPhase("joining");
 		setProblem(null);
-		channel.socket.current = connectRoom(
-			code,
-			trimmed,
-			joinEvents({
-				setPhase,
-				setYou,
-				setHost,
-				setPlayers,
-				setDeck,
-				setMatch,
-				setProblem,
-			}),
-		);
+		channel.socket.current = openRoomSocket(code, trimmed, you ?? undefined, {
+			setPhase,
+			setYou,
+			setHost,
+			setPlayers,
+			setDeck,
+			setMatch,
+			setProblem,
+		});
 	};
 
 	useAutoJoin(autoName, join);
@@ -247,47 +289,4 @@ function RoomPage() {
 			{match ? <MatchOverlay game={match} /> : null}
 		</div>
 	);
-}
-
-export function PhaseView({
-	phase,
-	problem,
-	name,
-	busy,
-	deck,
-	players,
-	host,
-	you,
-	onName,
-	onJoin,
-	onSwipe,
-	onStart,
-}: {
-	phase: Phase;
-	problem: string | null;
-	name: string;
-	busy: boolean;
-	deck: GameCard[];
-	players: RoomPlayer[];
-	host: string | null;
-	you: string | null;
-	onName: (v: string) => void;
-	onJoin: () => void;
-	onSwipe: (gameId: number, direction: "left" | "right") => void;
-	onStart: () => void;
-}) {
-	if (phase === "name" || phase === "joining") {
-		return <JoinForm name={name} busy={busy} onName={onName} onJoin={onJoin} />;
-	}
-	if (phase === "error") {
-		return (
-			<p className="font-mono mt-6 text-xs uppercase tracking-[1.5px] text-white">
-				{problem}
-			</p>
-		);
-	}
-	if (phase === "lobby") {
-		return <Lobby players={players} host={host} you={you} onStart={onStart} />;
-	}
-	return <SwipeDeck deck={deck} onSwipe={onSwipe} />;
 }

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { Button, Field, PillTag } from "#/components/ui";
+import { SwipeDeck } from "#/components/swipe-deck";
 import type { GameCard, RoomPlayer } from "#/server/room-protocol";
 
 export function Lobby({
@@ -157,4 +158,49 @@ export function MatchOverlay({ game }: { game: GameCard }) {
 			</div>
 		</div>
 	);
+}
+
+export type Phase = "name" | "joining" | "lobby" | "deck" | "error";
+
+export function PhaseView({
+	phase,
+	problem,
+	name,
+	busy,
+	deck,
+	players,
+	host,
+	you,
+	onName,
+	onJoin,
+	onSwipe,
+	onStart,
+}: {
+	phase: Phase;
+	problem: string | null;
+	name: string;
+	busy: boolean;
+	deck: GameCard[];
+	players: RoomPlayer[];
+	host: string | null;
+	you: string | null;
+	onName: (v: string) => void;
+	onJoin: () => void;
+	onSwipe: (gameId: number, direction: "left" | "right") => void;
+	onStart: () => void;
+}) {
+	if (phase === "name" || phase === "joining") {
+		return <JoinForm name={name} busy={busy} onName={onName} onJoin={onJoin} />;
+	}
+	if (phase === "error") {
+		return (
+			<p className="font-mono mt-6 text-xs uppercase tracking-[1.5px] text-white">
+				{problem}
+			</p>
+		);
+	}
+	if (phase === "lobby") {
+		return <Lobby players={players} host={host} you={you} onStart={onStart} />;
+	}
+	return <SwipeDeck deck={deck} onSwipe={onSwipe} />;
 }
