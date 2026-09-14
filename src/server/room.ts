@@ -232,6 +232,14 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						}
 						if (claim) {
 							socket.serializeAttachment({ id: claim });
+							// NOTE: the dropped socket may still sit in sessions
+							// under its fetch id (close ordering) — purge it so
+							// the seat has exactly one live socket.
+							for (const [key, peer] of sessions) {
+								if (peer === socket) continue;
+								const peerSeat = peer.deserializeAttachment<{ id: string }>();
+								if (peerSeat?.id === claim) sessions.delete(key);
+							}
 							const left = away.get(claim);
 							away.delete(claim);
 							yield* state.storage.sql.exec(
@@ -322,7 +330,17 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					const now = Date.now();
 					yield* sweepExpired(now);
 					yield* onClose(ws, code, reason);
-					if (attachment && names.has(attachment.id)) {
+					// NOTE: stale close — the seat already rejoined on another
+					// socket, so this close must not mark it away.
+					const reseated =
+						!!attachment &&
+						Array.from(sessions.values()).some(
+							(peer) =>
+								peer !== ws &&
+								peer.deserializeAttachment<{ id: string }>()?.id ===
+									attachment.id,
+						);
+					if (attachment && names.has(attachment.id) && !reseated) {
 						yield* markAway(attachment.id, now);
 						if (attachment.id === host) {
 							host =
