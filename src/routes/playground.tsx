@@ -1,26 +1,27 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
-import { Button, Field, PillTag } from "#/components/ui";
+import { Button, Field } from "#/components/ui";
 import { FIXTURE_DECK } from "#/components/dev-fixtures";
 import { useCollectionFetch } from "#/components/create-flow";
 import {
 	addFakeUser,
 	applySwipe,
 	createRoomState,
+	dropUser,
 	evaluateRoom,
 	joinUser,
 	kickUser,
+	rejoinUser,
 	roomDone,
 	startRoom,
 	type SimRoom,
-	type SimUser,
 } from "#/components/fake-room";
 import { PlaySidebar } from "#/components/play-sidebar";
+import { RoomSim } from "#/components/play-sim";
 import { FetchForm } from "#/routes/create";
 import type { GameCard } from "#/server/room-protocol";
-import { Lobby, MatchOverlay } from "#/components/room-views";
-import { SwipeDeck, type Direction } from "#/components/swipe-deck";
 
 export const Route = createFileRoute("/playground")({
 	beforeLoad: () => {
@@ -28,6 +29,26 @@ export const Route = createFileRoute("/playground")({
 	},
 	component: Playground,
 });
+
+function simActions(setRoom: Dispatch<SetStateAction<SimRoom | null>>) {
+	return {
+		create: (name: string, deck: GameCard[]) =>
+			setRoom(createRoomState(name, deck)),
+		join: (name: string, code: string) =>
+			setRoom((prev) => (prev ? joinUser(prev, name, code) : prev)),
+		start: () => setRoom((prev) => (prev ? startRoom(prev) : prev)),
+		swipe: (userId: string, gameId: number, direction: "left" | "right") =>
+			setRoom((prev) =>
+				prev ? applySwipe(prev, userId, gameId, direction) : prev,
+			),
+		kick: (id: string) => setRoom((prev) => (prev ? kickUser(prev, id) : prev)),
+		drop: (id: string) => setRoom((prev) => (prev ? dropUser(prev, id) : prev)),
+		rejoin: (id: string) =>
+			setRoom((prev) => (prev ? rejoinUser(prev, id) : prev)),
+		addFake: () => setRoom((prev) => (prev ? addFakeUser(prev) : prev)),
+		reset: () => setRoom(null),
+	};
+}
 
 function useSimRoom() {
 	const [room, setRoom] = useState<SimRoom | null>(null);
@@ -56,21 +77,7 @@ function useSimRoom() {
 		setRoom((prev) => (prev ? { ...prev, match: game, noMatch: !game } : prev));
 	}, [room]);
 
-	const create = (name: string, deck: GameCard[]) =>
-		setRoom(createRoomState(name, deck));
-	const join = (name: string, code: string) =>
-		setRoom((prev) => (prev ? joinUser(prev, name, code) : prev));
-	const start = () => setRoom((prev) => (prev ? startRoom(prev) : prev));
-	const swipe = (userId: string, gameId: number, direction: Direction) =>
-		setRoom((prev) =>
-			prev ? applySwipe(prev, userId, gameId, direction) : prev,
-		);
-	const kick = (id: string) =>
-		setRoom((prev) => (prev ? kickUser(prev, id) : prev));
-	const addFake = () => setRoom((prev) => (prev ? addFakeUser(prev) : prev));
-	const reset = () => setRoom(null);
-
-	return { room, create, join, start, swipe, kick, addFake, reset };
+	return { room, ...simActions(setRoom) };
 }
 
 function Playground() {
@@ -175,98 +182,5 @@ function DeckStatus({
 					: `fixture deck (${FIXTURE_DECK.length})`}
 			</p>
 		</>
-	);
-}
-
-function RoomSim({
-	room,
-	sim,
-}: {
-	room: SimRoom;
-	sim: ReturnType<typeof useSimRoom>;
-}) {
-	const hostId = room.users.find((u) => u.host && !u.kicked)?.id ?? null;
-	const active = room.users.filter((u) => !u.kicked);
-
-	return (
-		<div className="mx-auto w-full max-w-3xl">
-			{room.notice ? (
-				<p className="font-mono mt-4 text-xs uppercase tracking-[1.5px] text-white">
-					{room.notice}
-				</p>
-			) : null}
-			<Lobby
-				players={active.map(({ id, name: n }) => ({ id, name: n }))}
-				host={hostId}
-				you={hostId}
-				onStart={sim.start}
-			/>
-			<div className="mt-8 grid gap-8 md:grid-cols-2">
-				{active.map((u) => (
-					<UserPane
-						key={u.id}
-						user={u}
-						deck={room.deck}
-						started={room.started}
-						onSwipe={(gameId, direction) => sim.swipe(u.id, gameId, direction)}
-						onKick={() => sim.kick(u.id)}
-					/>
-				))}
-			</div>
-			<SimOutcome room={room} />
-		</div>
-	);
-}
-
-function SimOutcome({ room }: { room: SimRoom }) {
-	return (
-		<>
-			{room.match ? <MatchOverlay game={room.match} /> : null}
-			{room.noMatch ? (
-				<p className="font-mono mt-8 text-center text-xs uppercase tracking-[1.8px] text-fog">
-					No match — nobody agreed on anything.
-				</p>
-			) : null}
-		</>
-	);
-}
-
-function UserPane({
-	user,
-	deck,
-	started,
-	onSwipe,
-	onKick,
-}: {
-	user: SimUser;
-	deck: GameCard[];
-	started: boolean;
-	onSwipe: (gameId: number, direction: Direction) => void;
-	onKick: () => void;
-}) {
-	return (
-		<section className="border border-white/20 bg-canvas p-4">
-			<div className="flex items-center gap-3">
-				<span className="font-sans text-lg font-bold text-white">
-					{user.name}
-				</span>
-				{user.host ? <PillTag tone="mint">Host</PillTag> : null}
-				{user.fake ? <PillTag tone="slate">Fake</PillTag> : null}
-				<button
-					type="button"
-					onClick={onKick}
-					className="font-mono ml-auto cursor-pointer text-[11px] uppercase tracking-[1.1px] text-fog"
-				>
-					Kick
-				</button>
-			</div>
-			{started ? (
-				<SwipeDeck key={user.id} deck={deck} onSwipe={onSwipe} />
-			) : (
-				<p className="font-mono mt-4 text-[11px] uppercase tracking-[1.1px] text-fog">
-					Waiting for start…
-				</p>
-			)}
-		</section>
 	);
 }

@@ -16,8 +16,9 @@ type SeenMsg = {
 	host?: string | null;
 	deck?: { id: number; name: string }[];
 	started?: boolean;
-	players?: { name: string }[];
+	players?: { id: string; name: string }[];
 	game?: { name: string };
+	reason?: string;
 	[key: string]: unknown;
 };
 
@@ -28,16 +29,18 @@ const init = await fetch(`${BACKEND}/room/${CODE}/init`, {
 });
 console.log("init:", init.status);
 
-const connect = (name: string) =>
+const url = `${BACKEND}/room/${CODE}`.replace("http", "ws");
+
+const connect = (name: string, claimId?: string) =>
 	new Promise<{ ws: WebSocket; seen: SeenMsg[] }>((resolve, reject) => {
 		const seen: SeenMsg[] = [];
-		const ws = new WebSocket(`${BACKEND}/room/${CODE}`.replace("http", "ws"));
+		const ws = new WebSocket(url);
 		const timer = setTimeout(
 			() => reject(new Error(`${name} join timeout`)),
 			10000,
 		);
 		ws.addEventListener("open", () => {
-			ws.send(JSON.stringify({ type: "join", name }));
+			ws.send(JSON.stringify({ type: "join", name, claimId }));
 		});
 		ws.addEventListener("message", (e) => {
 			const msg = JSON.parse(e.data as string) as SeenMsg;
@@ -46,6 +49,31 @@ const connect = (name: string) =>
 				clearTimeout(timer);
 				resolve({ ws, seen });
 			}
+		});
+		ws.addEventListener("error", () => {
+			reject(new Error(`${name} socket error`));
+		});
+	});
+
+// NOTE: post-start joins are refused with no deck leak — the socket gets
+// a refusal and a close, never a joined.
+const connectRefused = (name: string) =>
+	new Promise<{ seen: SeenMsg[]; code: number }>((resolve, reject) => {
+		const seen: SeenMsg[] = [];
+		const ws = new WebSocket(url);
+		const timer = setTimeout(
+			() => reject(new Error(`${name} refusal timeout`)),
+			10000,
+		);
+		ws.addEventListener("open", () => {
+			ws.send(JSON.stringify({ type: "join", name }));
+		});
+		ws.addEventListener("message", (e) => {
+			seen.push(JSON.parse(e.data as string) as SeenMsg);
+		});
+		ws.addEventListener("close", (e) => {
+			clearTimeout(timer);
+			resolve({ seen, code: (e as CloseEvent).code });
 		});
 		ws.addEventListener("error", () => {
 			reject(new Error(`${name} socket error`));
@@ -62,6 +90,7 @@ const playerNames = (msg: SeenMsg) =>
 
 const a = await connect("ann");
 const b = await connect("bob");
+const d = await connect("dan");
 const ja = ofType(a.seen, "joined")[0] as SeenMsg;
 const jb = ofType(b.seen, "joined")[0] as SeenMsg;
 console.log(
@@ -95,24 +124,59 @@ const sa = ofType(a.seen, "start");
 const sb = ofType(b.seen, "start");
 console.log("start received A/B:", sa.length, sb.length);
 
+const refused = await connectRefused("cara");
+const refusedMsgs = ofType(refused.seen, "refused");
+console.log(
+	"late join refused (want 1):",
+	refusedMsgs.length,
+	"reason:",
+	refusedMsgs[0]?.reason,
+	"close:",
+	refused.code,
+	"deck leaked (want 0):",
+	ofType(refused.seen, "joined").length,
+);
+
 a.ws.send(JSON.stringify({ type: "swipe", gameId: 1, direction: "right" }));
-await sleep(800);
 b.ws.send(JSON.stringify({ type: "swipe", gameId: 1, direction: "right" }));
+await sleep(800);
+b.ws.close();
+await sleep(1000);
+const b2 = await connect("bob", jb.you);
+const jr = ofType(b2.seen, "joined")[0] as SeenMsg;
+console.log(
+	"rejoin same seat:",
+	jr.you === jb.you,
+	"players:",
+	playerNames(jr),
+	"host still A:",
+	jr.host === ja.you,
+	"deck dealt:",
+	(jr.deck ?? []).length,
+);
+
+d.ws.send(JSON.stringify({ type: "swipe", gameId: 1, direction: "right" }));
 await sleep(1500);
-const matches = ofType([...a.seen, ...b.seen], "match");
+const matches = ofType([...a.seen, ...b.seen, ...b2.seen, ...d.seen], "match");
 const firstGame = matches[0]?.game;
-console.log("match msgs (want 2):", matches.length, firstGame?.name);
+console.log("match msgs (want 3):", matches.length, firstGame?.name);
 
 const ok =
 	ja.you !== undefined &&
 	ja.you === ja.host &&
 	(ja.deck ?? []).length === 0 &&
 	jb.host === ja.you &&
-	matches.length === 2 &&
+	refusedMsgs.length === 1 &&
+	refusedMsgs[0]?.reason === "started" &&
+	refused.code === 4000 &&
+	jr.you === jb.you &&
+	jr.host === ja.you &&
+	matches.length === 3 &&
 	firstGame?.name === "Azul" &&
 	sa.length === 1 &&
 	sb.length === 1;
 console.log(ok ? "PASS" : "FAIL");
 a.ws.close();
-b.ws.close();
+b2.ws.close();
+d.ws.close();
 process.exit(ok ? 0 : 1);

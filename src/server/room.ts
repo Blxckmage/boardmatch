@@ -5,11 +5,16 @@ import {
 	type GameCard,
 	type RoomPlayer,
 	type ServerMsg,
+	activeVoters,
 	checkMatch,
+	graceExpired,
 } from "./room-protocol.ts";
 
 type Sessions = Map<string, Cloudflare.WebSocket>;
 type Names = Map<string, string>;
+type Away = Map<string, { at: number; host: boolean }>;
+
+const leftKey = (id: string): string => `left:${id}`;
 
 const listPlayers = (names: Names): RoomPlayer[] =>
 	[...names.entries()].map(([id, name]) => ({ id, name }));
@@ -49,13 +54,12 @@ const registerJoin = (
 		return attachment.id;
 	});
 
-const handleClose = (sessions: Sessions, names: Names) =>
+// NOTE: close drops the socket but keeps the seat — the player is away
+// in grace, not gone. Names are purged only by sweep after expiry.
+const dropSession = (sessions: Sessions) =>
 	Effect.fn(function* (ws: Cloudflare.WebSocket, code: number, reason: string) {
 		const attachment = ws.deserializeAttachment<{ id: string }>();
-		if (attachment) {
-			sessions.delete(attachment.id);
-			names.delete(attachment.id);
-		}
+		if (attachment) sessions.delete(attachment.id);
 		yield* ws.close(code, reason);
 	});
 
@@ -70,7 +74,11 @@ const parseMessage = (message: string | ArrayBuffer): ClientMsg => {
 const isClientMsg = (value: unknown): value is ClientMsg => {
 	if (typeof value !== "object" || value === null) return false;
 	const msg = value as Record<string, unknown>;
-	if (msg.type === "join") return typeof msg.name === "string";
+	if (msg.type === "join")
+		return (
+			typeof msg.name === "string" &&
+			(msg.claimId === undefined || typeof msg.claimId === "string")
+		);
 	if (msg.type === "start") return true;
 	if (msg.type === "swipe")
 		return (
@@ -113,11 +121,59 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 			let started = (yield* readKey("started")) === "1";
 			const sessions: Sessions = new Map();
 			const names: Names = new Map();
+			const away: Away = new Map();
 			for (const socket of yield* state.getWebSockets()) {
 				const data = socket.deserializeAttachment<{ id: string }>();
 				if (data) sessions.set(data.id, socket);
 			}
-			const onClose = handleClose(sessions, names);
+			const allCursor = yield* state.storage.sql.exec<{
+				key: string;
+				value: string;
+			}>("SELECT key, value FROM room");
+			for (const row of yield* allCursor.toArray()) {
+				if (!row.key.startsWith("left:")) continue;
+				away.set(
+					row.key.slice("left:".length),
+					JSON.parse(row.value) as { at: number; host: boolean },
+				);
+			}
+			// NOTE: lazy expiry — no alarms. Expired seats are purged on the
+			// next message or close, never by a timer.
+			const sweepExpired = (now: number) =>
+				Effect.gen(function* () {
+					let changed = false;
+					for (const [id, left] of away) {
+						if (!graceExpired(now, left.at)) continue;
+						away.delete(id);
+						names.delete(id);
+						yield* state.storage.sql.exec(
+							"DELETE FROM room WHERE key = ?",
+							leftKey(id),
+						);
+						if (id === host) {
+							host = [...names.keys()][0] ?? null;
+						}
+						changed = true;
+					}
+					if (changed) {
+						yield* broadcast(sessions, {
+							type: "players",
+							players: listPlayers(names),
+							host,
+						});
+					}
+				});
+			const markAway = (id: string, now: number) =>
+				Effect.gen(function* () {
+					const seat = { at: now, host: id === host };
+					away.set(id, seat);
+					yield* state.storage.sql.exec(
+						"INSERT OR REPLACE INTO room (key, value) VALUES (?, ?)",
+						leftKey(id),
+						JSON.stringify(seat),
+					);
+				});
+			const onClose = dropSession(sessions);
 			return {
 				initDeck: (next: GameCard[]) =>
 					Effect.gen(function* () {
@@ -128,6 +184,10 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						yield* state.storage.sql.exec(
 							"DELETE FROM room WHERE key IN ('closed', 'started')",
 						);
+						yield* state.storage.sql.exec(
+							"DELETE FROM room WHERE key LIKE 'left:%'",
+						);
+						away.clear();
 						deck.length = 0;
 						deck.push(...next);
 						closed = null;
@@ -152,6 +212,34 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					});
 					if (!isClientMsg(parsed)) return;
 					if (parsed.type === "join") {
+						const now = Date.now();
+						yield* sweepExpired(now);
+						// NOTE: closed rooms stay closed — a post-start join is
+						// refused with no deck leak, unless it reclaims a seat
+						// still inside grace.
+						const claim =
+							parsed.claimId &&
+							names.has(parsed.claimId) &&
+							away.has(parsed.claimId)
+								? parsed.claimId
+								: null;
+						if (started && !claim) {
+							yield* send(socket, { type: "refused", reason: "started" });
+							yield* socket.close(4000, "game already started");
+							const doomed = socket.deserializeAttachment<{ id: string }>();
+							if (doomed) sessions.delete(doomed.id);
+							return;
+						}
+						if (claim) {
+							socket.serializeAttachment({ id: claim });
+							const left = away.get(claim);
+							away.delete(claim);
+							yield* state.storage.sql.exec(
+								"DELETE FROM room WHERE key = ?",
+								leftKey(claim),
+							);
+							if (left?.host) host = claim;
+						}
 						const pre = socket.deserializeAttachment<{ id: string }>();
 						if (pre && !host) host = pre.id;
 						const id = yield* registerJoin(
@@ -172,6 +260,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						return;
 					}
 					if (parsed.type === "start") {
+						yield* sweepExpired(Date.now());
 						const attachment = socket.deserializeAttachment<{ id: string }>();
 						if (
 							!attachment ||
@@ -188,6 +277,8 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						yield* broadcast(sessions, { type: "start", deck });
 						return;
 					}
+					const now = Date.now();
+					yield* sweepExpired(now);
 					if (!started || closed) return;
 					const attachment = socket.deserializeAttachment<{ id: string }>();
 					const name = attachment ? names.get(attachment.id) : undefined;
@@ -199,7 +290,11 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						parsed.direction,
 					);
 					if (parsed.direction !== "right") return;
-					const voters = [...names.keys()];
+					const voters = activeVoters(
+						[...names.keys()],
+						new Map([...away].map(([id, left]) => [id, left.at])),
+						now,
+					);
 					const likesCursor = yield* state.storage.sql.exec<{
 						player: string;
 					}>(
@@ -224,10 +319,16 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 					reason: string,
 				) {
 					const attachment = ws.deserializeAttachment<{ id: string }>();
+					const now = Date.now();
+					yield* sweepExpired(now);
 					yield* onClose(ws, code, reason);
-					if (!attachment) return;
-					if (attachment.id === host) {
-						host = [...names.keys()][0] ?? null;
+					if (attachment && names.has(attachment.id)) {
+						yield* markAway(attachment.id, now);
+						if (attachment.id === host) {
+							host =
+								[...names.keys()].find((id) => id !== attachment.id) ??
+								attachment.id;
+						}
 					}
 					yield* broadcast(sessions, {
 						type: "players",

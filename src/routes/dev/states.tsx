@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
-import { PhaseView } from "#/routes/rooms/$code";
+import { PhaseView } from "#/components/room-views";
 import { MatchOverlay } from "#/components/room-views";
 import {
 	FIXTURE_DECK,
