@@ -29,6 +29,13 @@ const broadcast = (sessions: Sessions, msg: ServerMsg) =>
 		}
 	});
 
+// NOTE: server truth for `alchemy logs --tail` — joins, refusals,
+// drops, expiries. The client can lie (dead tabs); these cannot.
+const log = (...parts: unknown[]) =>
+	Effect.sync(() => {
+		console.log("[room]", ...parts);
+	});
+
 const registerJoin = (
 	sessions: Sessions,
 	names: Names,
@@ -167,6 +174,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						if (!graceExpired(now, left.at)) continue;
 						away.delete(id);
 						names.delete(id);
+						yield* log("expired", id);
 						yield* state.storage.sql.exec(
 							"DELETE FROM room WHERE key = ?",
 							leftKey(id),
@@ -252,6 +260,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 								: null;
 						if (started && !claim) {
 							yield* send(socket, { type: "refused", reason: "started" });
+							yield* log("refused", parsed.name);
 							yield* socket.close(4000, "game already started");
 							const doomed = socket.deserializeAttachment<{ id: string }>();
 							if (doomed) sessions.delete(doomed.id);
@@ -293,6 +302,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							started,
 						);
 						if (!id) return;
+						yield* log("join", parsed.name, id, started ? "started" : "lobby");
 						yield* state.storage.sql.exec(
 							"INSERT OR REPLACE INTO room (key, value) VALUES (?, ?)",
 							`player:${id}`,
@@ -380,6 +390,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 						);
 					if (attachment && names.has(attachment.id) && !reseated) {
 						yield* markAway(attachment.id, now);
+						yield* log("away", attachment.id);
 						if (attachment.id === host) {
 							host =
 								[...names.keys()].find((id) => id !== attachment.id) ??

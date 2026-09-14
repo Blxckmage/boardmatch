@@ -40,6 +40,7 @@ function PhasePreview({
 			<PhaseView
 				phase={phase}
 				problem={problem}
+				code="PREVIEW"
 				name={name}
 				busy={busy}
 				deck={deck}
@@ -72,6 +73,16 @@ function StatePreviews() {
 				title="Error"
 				phase="error"
 				problem="Connection failed — the room needs workerd."
+			/>
+			<PhasePreview
+				title="Error (refused)"
+				phase="error"
+				problem="Game already started — no late joins."
+			/>
+			<PhasePreview
+				title="Error (connection lost)"
+				phase="error"
+				problem="Connection lost — rejoin your seat."
 			/>
 			<PhasePreview title="Room" phase="lobby" deck={FIXTURE_DECK} />
 			<PhasePreview title="Deck" phase="deck" deck={FIXTURE_DECK} />
