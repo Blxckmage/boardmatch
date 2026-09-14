@@ -116,13 +116,11 @@ function joinEvents(s: LobbySetters): RoomEvents {
 	};
 }
 
-export type JoinSetters = Omit<LobbySetters, "markSettled" | "isSettled">;
-
 export function openRoomSocket(
 	code: string,
 	name: string,
 	claimId: string | undefined,
-	s: JoinSetters,
+	s: Omit<LobbySetters, "markSettled" | "isSettled">,
 ) {
 	let done = false;
 	return connectRoom(
