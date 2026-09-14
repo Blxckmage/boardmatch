@@ -10,6 +10,7 @@
    Few-shot over abstract: two past examples of the wanted pattern beat a paragraph of adjectives; ask for them when taste matters.
    Evidence before synthesis: one probe per hypothesis, stop at the first confirmed cause; never ship a fix for an unconfirmed cause.
    Corrections graduate: any correction given twice becomes a standing rule here (or a HANDOVER gotcha) — propose the exact line when it happens.
+7. Specs first: every issue carries Goal / Surfaces / Scenarios / Non-goals / Gate in its description before implementation starts. Vague issue = rewrite the issue first, then branch.
 
 ## Call graph answers
 

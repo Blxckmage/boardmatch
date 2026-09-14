@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CreateRouteImport } from './routes/create'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as DevStatesRouteImport } from './routes/dev/states'
 import { Route as DevSwipeRouteImport } from './routes/dev/swipe'
 import { Route as RoomsCodeRouteImport } from './routes/rooms/$code'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const CreateRoute = CreateRouteImport.update({
   id: '/create',
   path: '/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevStatesRoute = DevStatesRouteImport.update({
@@ -50,6 +56,7 @@ const ApiRoomsCodeRoute = ApiRoomsCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/create': typeof CreateRoute
+  '/playground': typeof PlaygroundRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/create': typeof CreateRoute
+  '/playground': typeof PlaygroundRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/create': typeof CreateRoute
+  '/playground': typeof PlaygroundRoute
   '/dev/states': typeof DevStatesRoute
   '/dev/swipe': typeof DevSwipeRoute
   '/rooms/$code': typeof RoomsCodeRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/create'
+    | '/playground'
     | '/dev/states'
     | '/dev/swipe'
     | '/rooms/$code'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/create'
+    | '/playground'
     | '/dev/states'
     | '/dev/swipe'
     | '/rooms/$code'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/create'
+    | '/playground'
     | '/dev/states'
     | '/dev/swipe'
     | '/rooms/$code'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreateRoute: typeof CreateRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   DevStatesRoute: typeof DevStatesRoute
   DevSwipeRoute: typeof DevSwipeRoute
   RoomsCodeRoute: typeof RoomsCodeRoute
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create'
       preLoaderRoute: typeof CreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/states': {
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreateRoute: CreateRoute,
+  PlaygroundRoute: PlaygroundRoute,
   DevStatesRoute: DevStatesRoute,
   DevSwipeRoute: DevSwipeRoute,
   RoomsCodeRoute: RoomsCodeRoute,
