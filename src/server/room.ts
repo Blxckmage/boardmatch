@@ -130,13 +130,34 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 				key: string;
 				value: string;
 			}>("SELECT key, value FROM room");
+			// NOTE: names + host rebuild here — hibernatable sockets reattach
+			// after an eviction, but in-memory maps do not. Without this the
+			// room comes back brain-dead (swipes ignored, grace broken).
 			for (const row of yield* allCursor.toArray()) {
-				if (!row.key.startsWith("left:")) continue;
-				away.set(
-					row.key.slice("left:".length),
-					JSON.parse(row.value) as { at: number; host: boolean },
-				);
+				if (row.key.startsWith("left:")) {
+					away.set(
+						row.key.slice("left:".length),
+						JSON.parse(row.value) as { at: number; host: boolean },
+					);
+				} else if (row.key.startsWith("player:")) {
+					names.set(row.key.slice("player:".length), row.value);
+				} else if (row.key === "host" && names.has(row.value)) {
+					host = row.value;
+				}
 			}
+			const writeHost = () =>
+				Effect.gen(function* () {
+					if (host) {
+						yield* state.storage.sql.exec(
+							"INSERT OR REPLACE INTO room (key, value) VALUES ('host', ?)",
+							host,
+						);
+					} else {
+						yield* state.storage.sql.exec(
+							"DELETE FROM room WHERE key = 'host'",
+						);
+					}
+				});
 			// NOTE: lazy expiry — no alarms. Expired seats are purged on the
 			// next message or close, never by a timer.
 			const sweepExpired = (now: number) =>
@@ -150,8 +171,13 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							"DELETE FROM room WHERE key = ?",
 							leftKey(id),
 						);
+						yield* state.storage.sql.exec(
+							"DELETE FROM room WHERE key = ?",
+							`player:${id}`,
+						);
 						if (id === host) {
 							host = [...names.keys()][0] ?? null;
+							yield* writeHost();
 						}
 						changed = true;
 					}
@@ -185,9 +211,10 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							"DELETE FROM room WHERE key IN ('closed', 'started')",
 						);
 						yield* state.storage.sql.exec(
-							"DELETE FROM room WHERE key LIKE 'left:%'",
+							"DELETE FROM room WHERE key LIKE 'left:%' OR key LIKE 'player:%' OR key = 'host'",
 						);
 						away.clear();
+						names.clear();
 						deck.length = 0;
 						deck.push(...next);
 						closed = null;
@@ -246,10 +273,16 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 								"DELETE FROM room WHERE key = ?",
 								leftKey(claim),
 							);
-							if (left?.host) host = claim;
+							if (left?.host) {
+								host = claim;
+								yield* writeHost();
+							}
 						}
 						const pre = socket.deserializeAttachment<{ id: string }>();
-						if (pre && !host) host = pre.id;
+						if (pre && !host) {
+							host = pre.id;
+							yield* writeHost();
+						}
 						const id = yield* registerJoin(
 							sessions,
 							names,
@@ -260,6 +293,11 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							started,
 						);
 						if (!id) return;
+						yield* state.storage.sql.exec(
+							"INSERT OR REPLACE INTO room (key, value) VALUES (?, ?)",
+							`player:${id}`,
+							parsed.name,
+						);
 						yield* broadcast(sessions, {
 							type: "players",
 							players: listPlayers(names),
@@ -346,6 +384,7 @@ export default class Room extends Cloudflare.DurableObject<Room>()(
 							host =
 								[...names.keys()].find((id) => id !== attachment.id) ??
 								attachment.id;
+							yield* writeHost();
 						}
 					}
 					yield* broadcast(sessions, {
