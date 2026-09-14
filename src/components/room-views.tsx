@@ -116,6 +116,7 @@ export function JoinForm({
 				label="Display name"
 				placeholder="e.g. Faza"
 				value={name}
+				disabled={busy}
 				onChange={(e) => onName(e.target.value)}
 			/>
 			{tried && blank ? (

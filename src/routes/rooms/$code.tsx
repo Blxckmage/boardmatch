@@ -76,7 +76,7 @@ function useRoomChannel() {
 
 function useRoomConnection(code: string, autoName?: string) {
 	const [phase, setPhase] = useState<Phase>("name");
-	const [name, setName] = useState("");
+	const [name, setName] = useState(autoName ?? "");
 	const [problem, setProblem] = useState<string | null>(null);
 	const lobby = useLobbyState();
 	const { players, host, you, deck, match } = lobby;
@@ -84,6 +84,7 @@ function useRoomConnection(code: string, autoName?: string) {
 	const channel = useRoomChannel();
 
 	const join = (asName?: string) => {
+		if (phase !== "name" && phase !== "error") return;
 		const trimmed = (asName ?? name).trim();
 		if (!trimmed) return;
 		setPhase("joining");
